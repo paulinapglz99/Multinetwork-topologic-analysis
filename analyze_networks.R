@@ -115,7 +115,6 @@ analyze_one <- function(path) {
   cat("Processing:", nm, "\n")
   g <- tryCatch(read_edgelist(path), error = function(e) { message(e); return(NULL) })
   if (is.null(g)) return(NULL)
-  # Ensure simple undirected (remove loops/multiedges)
   g <- simplify(as.undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
   n <- vcount(g)
   m <- ecount(g)
@@ -123,36 +122,39 @@ analyze_one <- function(path) {
   ncomp <- comp$no
   gcc_size <- max(comp$csize)
   gcc_frac <- gcc_size / max(1, n)
-  # If giant component has >0 nodes, restrict distances to it for path metrics
   giant_vids <- V(g)[which(comp$membership == which.max(comp$csize))]
   g_giant <- induced_subgraph(g, giant_vids)
-  # Average path length & diameter: only on giant component (to avoid Inf)
   apl <- if (vcount(g_giant) > 1) mean_distance(g_giant, directed = FALSE, unconnected = FALSE) else NA
   diam <- if (vcount(g_giant) > 1) diameter(g_giant, directed = FALSE, weights = NA) else 0
   dens <- edge_density(g, loops = FALSE)
   assort <- tryCatch(assortativity_degree(g, directed = FALSE), error = function(e) NA_real_)
-  # clustering: local mean and global transitivity (triangle-based)
-  clustering_local_mean <- transitivity(g, type = "localaverage", isolates = "zero")  # average local
+  clustering_local_mean <- transitivity(g, type = "localaverage", isolates = "zero")
   clustering_global <- transitivity(g, type = "global")
-  # degree distribution summary
   degs <- degree(g)
   deg_mean <- mean(degs)
   deg_med <- median(degs)
   deg_sd <- sd(degs)
-  # K-core index (coreness)
   kcore <- coreness(g)
   kcore_max <- max(kcore)
-  # PageRank
   pr <- page_rank(g)$vector
   pr_top <- sort(pr, decreasing = TRUE)[1:min(5, length(pr))]
-  # Q modularity using Infomap partition
-  comm_infomap <- tryCatch(cluster_infomap(g), error = function(e) make_clusters(g, membership = rep(1, vcount(g))))
+  
+  # Detectar comunidades con Infomap (manejo de error)
+  comm_infomap <- tryCatch(
+    cluster_infomap(g),
+    error = function(e) make_clusters(g, membership = rep(1, n))
+  )
   Q_mod <- modularity(comm_infomap)
-  ncomponents <- ncomp
-  # Percolation thresholds (targeted + random)
+  
+  # Calcular comunidad más grande
+  comm_sizes <- sizes(comm_infomap)
+  largest_comm_size <- max(comm_sizes)
+  largest_comm_id <- which.max(comm_sizes)
+  
+  # Umbrales de percolación
   perc_targeted <- percolation_threshold(g, mode = "targeted", steps = opt$percol_steps, threshold_frac = 0.5, trials = 1)
   perc_random <- percolation_threshold(g, mode = "random", steps = opt$percol_steps, threshold_frac = 0.5, trials = 3)
-  # Compose summary
+  
   summary_row <- data.table(
     file = nm,
     n_nodes = n,
@@ -162,7 +164,7 @@ analyze_one <- function(path) {
     global_density = dens,
     size_giant_component = gcc_size,
     frac_giant_component = gcc_frac,
-    n_components = ncomponents,
+    n_components = ncomp,
     clustering_local_mean = clustering_local_mean,
     clustering_global = clustering_global,
     assortativity = assort,
@@ -172,9 +174,12 @@ analyze_one <- function(path) {
     kcore_max = kcore_max,
     Q_modularity = Q_mod,
     perc_targeted_50 = perc_targeted,
-    perc_random_50 = perc_random
+    perc_random_50 = perc_random,
+    n_communities = length(comm_sizes),        # total comunidades detectadas
+    largest_community_size = largest_comm_size, # tamaño comunidad más grande
+    largest_community_id = largest_comm_id     # id de la comunidad más grande
   )
-  # Optionally save per-node metrics (degree, pagerank, kcore, cluster membership)
+  
   node_table_path <- NA_character_
   if (opt$per_node) {
     node_dt <- data.table(
@@ -184,31 +189,31 @@ analyze_one <- function(path) {
       kcore = kcore,
       membership_infomap = membership(comm_infomap)
     )
-    node_table_path <- file.path(opt$out_dir, paste0(nm, "_nodes.csv"))
+    nm_base <- tools::file_path_sans_ext(nm)
+    node_table_path <- file.path(opt$out_dir, paste0(nm_base, "_summary.csv"))
     fwrite(node_dt, node_table_path)
   }
-  # free memory
   rm(g, g_giant, comp); gc(verbose = FALSE)
   return(list(summary = summary_row, node_table = node_table_path))
 }
 
-# Paraleliza sobre archivos
+#Parallelise over files
 plan(multisession, workers = opt$workers)
 results <- future_lapply(files, FUN = analyze_one, future.seed = TRUE)
 
-# Consolidate summaries
+#Consolidate summaries
 summaries <- rbindlist(lapply(results, function(x) if (!is.null(x)) x$summary else NULL), fill = TRUE)
 fwrite(summaries, file.path(opt$out_dir, "networks_summary.csv"))
 
-# Save metadata about per-node outputs
+#Save metadata about per-node outputs
 node_paths <- rbindlist(lapply(results, function(x) {
   if (!is.null(x) && !is.na(x$node_table)) data.table(file = x$summary$file, node_table = x$node_table) else NULL
 }), fill = TRUE)
 if (nrow(node_paths) > 0) fwrite(node_paths, file.path(opt$out_dir, "networks_nodes_index.csv"))
 
-cat("Análisis finalizado. Resumen guardado en:", file.path(opt$out_dir, "networks_summary.csv"), "\n")
+cat("Analysis completed. Summary saved in:", file.path(opt$out_dir, "networks_summary.csv"), "\n")
 
-# Optionally render an HTML report (simple) if requested
+#Optionally render an HTML report (simple) if requested
 if (opt$make_html) {
   if (!requireNamespace("rmarkdown", quietly = TRUE)) {
     warning("rmarkdown not installed; install to generate HTML")

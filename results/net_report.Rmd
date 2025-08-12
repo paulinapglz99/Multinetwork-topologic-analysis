@@ -1,0 +1,13 @@
+---
+title: "Network analysis report"
+output: html_document
+---
+
+```{r, echo=FALSE}
+library(data.table); library(ggplot2)
+summary <- fread(' results/networks_summary.csv ')
+print(head(summary))
+# ejemplo: histograma de n_nodes
+p <- ggplot(summary, aes(x = n_nodes)) + geom_histogram(bins=40) + theme_minimal()
+print(p)
+```

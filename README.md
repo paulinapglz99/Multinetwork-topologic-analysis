@@ -37,3 +37,18 @@ Here we calculate
     Clustering coefficient — local cohesion of neighbourhoods (can be averaged globally but is a measure of intermediate structure).
 
     Q modularity — quality of partitioning into communities.
+    
+    
+#Packages needed
+
+igraph
+data.table
+future.apply
+ggplot2
+rmarkdown 
+tidyverse
+
+#How to run
+
+Rscript analyze_networks.R --input_dir data/edges --pattern "*.tsv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
+

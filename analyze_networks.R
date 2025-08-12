@@ -109,7 +109,7 @@ percolation_threshold <- function(g, mode = c("random","targeted"), steps = 51, 
   }
 }
 
-# Function to analyze one file -> list with summary and optional node table path
+#Function to analyze one file -> list with summary and optional node table path
 analyze_one <- function(path) {
   nm <- basename(path)
   cat("Processing:", nm, "\n")
@@ -139,19 +139,19 @@ analyze_one <- function(path) {
   pr <- page_rank(g)$vector
   pr_top <- sort(pr, decreasing = TRUE)[1:min(5, length(pr))]
   
-  # Detectar comunidades con Infomap (manejo de error)
+  #Detecting communities with Infomap (error handling)
   comm_infomap <- tryCatch(
     cluster_infomap(g),
     error = function(e) make_clusters(g, membership = rep(1, n))
   )
   Q_mod <- modularity(comm_infomap)
   
-  # Calcular comunidad más grande
+  #Calculate largest community
   comm_sizes <- sizes(comm_infomap)
   largest_comm_size <- max(comm_sizes)
   largest_comm_id <- which.max(comm_sizes)
   
-  # Umbrales de percolación
+  #Percolation thresholds
   perc_targeted <- percolation_threshold(g, mode = "targeted", steps = opt$percol_steps, threshold_frac = 0.5, trials = 1)
   perc_random <- percolation_threshold(g, mode = "random", steps = opt$percol_steps, threshold_frac = 0.5, trials = 3)
   
@@ -175,9 +175,9 @@ analyze_one <- function(path) {
     Q_modularity = Q_mod,
     perc_targeted_50 = perc_targeted,
     perc_random_50 = perc_random,
-    n_communities = length(comm_sizes),        # total comunidades detectadas
-    largest_community_size = largest_comm_size, # tamaño comunidad más grande
-    largest_community_id = largest_comm_id     # id de la comunidad más grande
+    n_communities = length(comm_sizes),        #total communities detected
+    largest_community_size = largest_comm_size, #largest community size
+    largest_community_id = largest_comm_id     #ID of the largest community
   )
   
   node_table_path <- NA_character_
@@ -190,19 +190,20 @@ analyze_one <- function(path) {
       membership_infomap = membership(comm_infomap)
     )
     nm_base <- tools::file_path_sans_ext(nm)
-    node_table_path <- file.path(opt$out_dir, paste0(nm_base, "_summary.csv"))
+    node_table_path <- file.path(opt$out_dir, paste0(nm_base, "_nodes_summary.csv"))
     fwrite(node_dt, node_table_path)
   }
   rm(g, g_giant, comp); gc(verbose = FALSE)
   return(list(summary = summary_row, node_table = node_table_path))
 }
 
-#Parallelise over files
+#Parallelize over files
 plan(multisession, workers = opt$workers)
 results <- future_lapply(files, FUN = analyze_one, future.seed = TRUE)
 
 #Consolidate summaries
 summaries <- rbindlist(lapply(results, function(x) if (!is.null(x)) x$summary else NULL), fill = TRUE)
+summaries$network <- sub("^network_", "", tools::file_path_sans_ext(summaries$file))
 fwrite(summaries, file.path(opt$out_dir, "networks_summary.csv"))
 
 #Save metadata about per-node outputs
@@ -223,10 +224,17 @@ if (opt$make_html) {
 title: \"Network analysis report\"
 output: html_document
 ---\n\n", file = rmd)
-    cat("```{r, echo=FALSE}\nlibrary(data.table); library(ggplot2)\nsummary <- fread('", file.path(opt$out_dir, "networks_summary.csv"), "')\nprint(head(summary))\n# ejemplo: histograma de n_nodes\np <- ggplot(summary, aes(x = n_nodes)) + geom_histogram(bins=40) + theme_minimal()\nprint(p)\n```\n", file = rmd, append = TRUE)
+    cat("```{r, echo=FALSE}\nlibrary(data.table);
+        library(ggplot2)\n
+        summary <- fread('", file.path(opt$out_dir, "networks_summary.csv"), "')\n
+        print(head(summary))\n
+        # ejemplo: histograma de n_nodes\np <- ggplot(summary, aes(x = n_nodes)) + geom_histogram(bins=40) + theme_minimal()\n
+        print(p)\n```\n", file = rmd, append = TRUE)
     rmarkdown::render(rmd, output_file = file.path(opt$out_dir, "net_report.html"), quiet = TRUE)
     cat("HTML report generated in:", file.path(opt$out_dir, "net_report.html"), "\n")
   }
 }
 
 q(status = 0)
+
+#END

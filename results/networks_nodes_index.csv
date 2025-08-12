@@ -1,6 +1,6 @@
 file,node_table
-network_1.csv,results/network_1_summary.csv
-network_2.csv,results/network_2_summary.csv
-network_3.csv,results/network_3_summary.csv
-network_4.csv,results/network_4_summary.csv
-network_5.csv,results/network_5_summary.csv
+network_1.csv,results/network_1_nodes_summary.csv
+network_2.csv,results/network_2_nodes_summary.csv
+network_3.csv,results/network_3_nodes_summary.csv
+network_4.csv,results/network_4_nodes_summary.csv
+network_5.csv,results/network_5_nodes_summary.csv

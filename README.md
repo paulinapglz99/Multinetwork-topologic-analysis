@@ -39,7 +39,7 @@ Here we calculate
     Q modularity — quality of partitioning into communities.
     
     
-#Packages needed
+# Packages needed
 
 igraph
 data.table
@@ -48,7 +48,7 @@ ggplot2
 rmarkdown 
 tidyverse
 
-#How to run
+# How to run
 
-Rscript analyze_networks.R --input_dir data/edges --pattern "*.tsv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
+Rscript analyze_networks.R --input_dir data/edges --pattern "*.csv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
 

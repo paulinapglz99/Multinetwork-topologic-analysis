@@ -16,13 +16,11 @@ for(i in 1:5) {
     #Preferential Attachment Barabasi-Albert (100 nodes, m=3 edges per new node)
     g <- sample_pa(100, power = 1, m = 3, directed = FALSE)
   }
-  
   #Extract list of unweighted edges
   edgelist <- as_data_frame(g, what = "edges")
   
   #Generate random weights between 0.1 and 1 for each edge
   w <- runif(nrow(edgelist), min = 0.1, max = 1)
-  
   edgelist$weight <- w
   
   #Save csv file without header
@@ -30,3 +28,5 @@ for(i in 1:5) {
 }
 
 cat("Sample files generated in", outdir, "\n")
+
+#END

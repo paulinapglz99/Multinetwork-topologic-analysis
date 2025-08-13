@@ -70,9 +70,13 @@ Rscript script.R -i path/to/directory/ -o results_dir/
 
 ## Example of running
 
-1. When data is in csv and you need 
+1. When data is an edgelist in .csv
 
 Rscript analyze_networks.R --input_dir data/edges --pattern "*.csv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
+
+2.When network is in graphml format with extension .graphml
+
+Rscript analyze_networks.R --input_dir test_data/graphmls --pattern "*.graphml" --out_dir results_graphml --workers 4 --per_node TRUE --make_html TRUE
 
 ## Help
 

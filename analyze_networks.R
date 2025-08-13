@@ -14,14 +14,15 @@ pacman::p_load(
   ggplot2,
   jsonlite,
   stringr,
-  optparse
+  optparse, 
+  tools
 )
 
 #Define option list for inputs
 
 option_list <- list(
   make_option(c("-i","--input_dir"), type="character", default=NULL, help="Folder with edge list files"),
-  make_option(c("-p","--pattern"), type="character", default=".*\\.(txt|tsv|csv)$", help="Pattern regex for files"),
+  make_option(c("-p","--pattern"), type="character", default=".*\\.(txt|tsv|csv|graphml)$", help="Pattern regex for files"),
   make_option(c("-o","--out_dir"), type="character", default="results", help="Output directory"),
   make_option(c("-w","--workers"), type="integer", default=2, help="Number of parallel workers"),
   make_option(c("--per_node"), action="store_true", default=FALSE, help="Save metrics per node (CSV per network)"),
@@ -40,16 +41,37 @@ files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)
 if (length(files)==0) stop("No files matching the pattern were found in input_dir.")
 
 #Helper function: reads edge list (flexible to 2 or 3 columns: source, target[,weight])
-read_edgelist <- function(path) {
-  dt <- tryCatch(fread(path, header = FALSE, data.table = TRUE), error = function(e) NULL)
-  if (is.null(dt)) stop(paste("Can't read", path))
-  setnames(dt, names(dt), paste0("V", seq_len(ncol(dt))))
-  if (ncol(dt) < 2) stop("The edge list must have at least 2 columns: source target")
-  if (ncol(dt) >= 3) {
-    g <- graph_from_data_frame(dt[, .(V1, V2, weight = V3)], directed = FALSE)
+
+read_network <- function(path) {
+  ext <- tolower(file_ext(path))
+  
+  if (ext %in% c("graphml")) {
+    #Read GraphML format
+    g <- read_graph(path, format = "graphml")
+    
+  } else if (ext %in% c("csv", "tsv", "txt")) {
+    #Detect whether it is an adjacency matrix or edgelist
+    sep <- ifelse(ext == "tsv", "\t", ",")
+    df <- fread(path, sep = sep)
+    
+    if (all(colnames(df)[-1] %in% colnames(df)) && nrow(df) == ncol(df)) {
+      #If it looks like an adjacency matrix (square and names match)
+      mat <- as.matrix(df[ , -1, with = FALSE])
+      rownames(mat) <- df[[1]]
+      g <- graph_from_adjacency_matrix(mat, mode = "undirected", diag = FALSE, weighted = TRUE)
+    } else {
+      #If looks like an edgelist:at least two columns (from, to), optional weight
+      if (ncol(df) >= 3) {
+        g <- graph_from_data_frame(df[, 1:3], directed = FALSE)
+      } else {
+        g <- graph_from_data_frame(df[, 1:2], directed = FALSE)
+      }
+    }
+    
   } else {
-    g <- graph_from_data_frame(dt[, .(V1, V2)], directed = FALSE)
+    stop("Format not supported or detected: ", ext)
   }
+  
   return(g)
 }
 
@@ -113,7 +135,7 @@ percolation_threshold <- function(g, mode = c("random","targeted"), steps = 51, 
 analyze_one <- function(path) {
   nm <- basename(path)
   cat("Processing:", nm, "\n")
-  g <- tryCatch(read_edgelist(path), error = function(e) { message(e); return(NULL) })
+  g <- tryCatch(read_network(path), error = function(e) { message(e); return(NULL) })
   if (is.null(g)) return(NULL)
   g <- simplify(as_undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
   n <- vcount(g)
@@ -254,7 +276,7 @@ if (opt$make_html) {
     "    geom_line() +\n",
     "    geom_point(color = color, size = 2.5) +\n",
     "    labs(title = title, x = 'Network', y = ylab) +\n",
-    "    scale_y_continuous(limits = c(max(df[[metric]])/4, max(df[[metric]]))) +\n",
+    "    scale_y_continuous(limits = c(max(df[[metric]])/5, max(df[[metric]]))) +\n",
     "    theme_pubclean() +\n",
     "    theme(legend.position = 'none', axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))\n",
     "}\n",

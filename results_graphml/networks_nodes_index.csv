@@ -1,0 +1,6 @@
+file,node_table
+network_1.graphml,results_graphml/network_1_nodes_summary.csv
+network_2.graphml,results_graphml/network_2_nodes_summary.csv
+network_3.graphml,results_graphml/network_3_nodes_summary.csv
+network_4.graphml,results_graphml/network_4_nodes_summary.csv
+network_5.graphml,results_graphml/network_5_nodes_summary.csv

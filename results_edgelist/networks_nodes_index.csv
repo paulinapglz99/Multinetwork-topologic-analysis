@@ -1,0 +1,6 @@
+file,node_table
+network_1_edgelist.csv,results_edgelist/network_1_edgelist_nodes_summary.csv
+network_2_edgelist.csv,results_edgelist/network_2_edgelist_nodes_summary.csv
+network_3_edgelist.csv,results_edgelist/network_3_edgelist_nodes_summary.csv
+network_4_edgelist.csv,results_edgelist/network_4_edgelist_nodes_summary.csv
+network_5_edgelist.csv,results_edgelist/network_5_edgelist_nodes_summary.csv

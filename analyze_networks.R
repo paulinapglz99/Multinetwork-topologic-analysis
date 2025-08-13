@@ -1,7 +1,6 @@
 #!/usr/bin/env Rscript
 
 # analyze_networks.R
-#Packages needed: igraph, data.table, future.apply, ggplot2, rmarkdown (opcional), tidyverse
 #Usage:
 #Rscript analyze_networks.R --input_dir data/edges --pattern "*.tsv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
 
@@ -12,6 +11,7 @@ ok<- pacman::p_load(
   "data.table",
   "future.apply",
   "ggplot2",
+  "tidyverse",
   "jsonlite",
   "stringr",
   "optparse", 
@@ -259,7 +259,7 @@ if (opt$make_html) {
   if (!requireNamespace("rmarkdown", quietly = TRUE)) {
     install.packages("rmarkdown")
   }
-  pacman::p_load(ggpubr, purrr)
+  pacman::p_load(ggpubr, purrr, rmarkdown)
   
   rmd <- file.path(opt$out_dir, "network_report.Rmd")
   

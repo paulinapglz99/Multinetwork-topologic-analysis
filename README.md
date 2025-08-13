@@ -58,8 +58,22 @@ The script automatically detects whether the file is:
 * data.table
 * future.apply
 * ggplot2
-* rmarkdown
 * tidyverse
+* jsonlite
+* stringr
+* optparse
+* tools
+* rmarkdown
+
+"igraph",
+  "data.table",
+  "future.apply",
+  "ggplot2",
+  "tidyverse",
+  "jsonlite",
+  "stringr",
+  "optparse", 
+  "tools"
 
 # How to run
 

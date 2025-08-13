@@ -99,6 +99,7 @@ V1,V2,V3
 0,0,1
 
 * When using edgelists, don't add column name.
+* Don't mix network formats, use a directory for each format if necessary
 
 ## Help
 

@@ -42,36 +42,45 @@ if (length(files)==0) stop("No files matching the pattern were found in input_di
 
 #Helper function: reads edge list (flexible to 2 or 3 columns: source, target[,weight])
 
+# Helper function: read a network from CSV/TSV/GraphML
 read_network <- function(path) {
-  ext <- tolower(file_ext(path))
+  ext <- tolower(tools::file_ext(path))
   
-  if (ext %in% c("graphml")) {
-    #Read GraphML format
+  if (ext == "graphml") {
+    # GraphML file
     g <- read_graph(path, format = "graphml")
     
   } else if (ext %in% c("csv", "tsv", "txt")) {
-    #Detect whether it is an adjacency matrix or edgelist
     sep <- ifelse(ext == "tsv", "\t", ",")
-    df <- fread(path, sep = sep)
+    df <- fread(path, sep = sep, header = FALSE, data.table = FALSE)
     
-    if (all(colnames(df)[-1] %in% colnames(df)) && nrow(df) == ncol(df)) {
-      #If it looks like an adjacency matrix (square and names match)
-      mat <- as.matrix(df[ , -1, with = FALSE])
-      rownames(mat) <- df[[1]]
-      g <- graph_from_adjacency_matrix(mat, mode = "undirected", diag = FALSE, weighted = TRUE)
-    } else {
-      #If looks like an edgelist:at least two columns (from, to), optional weight
+    # Check if first row contains non-numeric column names (adjacency matrix)
+    if (!all(sapply(df[1, ], is.numeric))) {
+      # First row = column names
+      colnames(df) <- as.character(df[1, ])
+      df <- df[-1, , drop = FALSE]
+      mat <- as.matrix(df)
+      storage.mode(mat) <- "numeric"
+      rownames(mat) <- colnames(mat)
+      # Create weighted undirected graph
+      g <- graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
+    } else if (ncol(df) >= 2) {
+      # Treat as edgelist: 2 or 3 columns
       if (ncol(df) >= 3) {
         g <- graph_from_data_frame(df[, 1:3], directed = FALSE)
       } else {
         g <- graph_from_data_frame(df[, 1:2], directed = FALSE)
       }
+    } else {
+      stop("Cannot interpret the file: ", path)
     }
     
   } else {
-    stop("Format not supported or detected: ", ext)
+    stop("Unsupported file format: ", ext)
   }
   
+  # Simplify graph (remove loops and multiple edges)
+  g <- simplify(as_undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
   return(g)
 }
 

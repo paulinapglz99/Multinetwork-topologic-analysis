@@ -39,7 +39,18 @@ Here we calculate
     Clustering coefficient — local cohesion of neighbourhoods (can be averaged globally but is a measure of intermediate structure).
 
     Q modularity — quality of partitioning into communities.
-    
+  
+The script automatically detects whether the file is:
+
+* GraphML
+
+* CSV/TSV → if the first row is not numerical, it interprets it as an adjacency matrix.
+
+* CSV/TSV with 2-3 columns → interprets it as an edgelist.
+
+* Creates a weighted graph if there are weights.
+
+* Handles loops and multiple edges automatically.
     
 # Packages needed
 
@@ -78,9 +89,17 @@ Rscript analyze_networks.R --input_dir data/edges --pattern "*.csv" --out_dir re
 
 Rscript analyze_networks.R --input_dir test_data/graphmls --pattern "*.graphml" --out_dir results_graphml --workers 4 --per_node TRUE --make_html TRUE
 
+## Note to consider
+
+* When using adjacency matrices, don't use a column with names, only add a row with gene names at the top of the matrix. e.g
+
+V1,V2,V3
+0,0,0
+0,1,0
+0,0,1
+
+* When using edgelists, don't add column name.
+
 ## Help
 
 Rscript script.R --help
-
-
-

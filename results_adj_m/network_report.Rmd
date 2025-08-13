@@ -1,0 +1,58 @@
+---
+title: "Network Analysis Report"
+output: html_document
+---
+
+```{r, echo=FALSE}
+if (!requireNamespace('pacman', quietly = TRUE)) install.packages('pacman')
+pacman::p_load(data.table, ggplot2, ggpubr, purrr)
+summary <- fread('networks_summary.csv')
+print(head(summary))
+```
+
+```{r, echo=FALSE}
+make_metric_plot <- function(df, metric, title, ylab, color) {
+  ggplot(df, aes(x = as.factor(network), y = .data[[metric]], group = 1)) +
+    geom_line() +
+    geom_point(color = color, size = 2.5) +
+    labs(title = title, x = 'Network', y = ylab) +
+    scale_y_continuous(limits = c(max(df[[metric]])/5, max(df[[metric]]))) +
+    theme_pubclean() +
+    theme(legend.position = 'none', axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))
+}
+```
+
+```{r, echo=FALSE}
+plot_specs <- data.frame(
+  var = c(
+    'n_nodes', 'n_edges', 'n_components', 'n_communities', 'deg_mean', 'avg_path_len',
+    'clustering_global', 'clustering_local_mean', 'diameter', 'global_density',
+    'size_giant_component', 'frac_giant_component', 'Q_modularity', 'perc_targeted_50'
+  ),
+  title = c(
+    'Number of vertices (genes)', 'Number of edges', 'Number of components',
+    'Number of communities (INFOMAP)', 'Mean degree of nodes', 'Average path length',
+    'Global clustering', 'Local clustering coefficient', 'Diameter', 'Global density',
+    'Size of the giant component', 'Fraction of giant component', 'Q modularity', 'Percolation threshold'
+  ),
+  ylab = c(
+    'Number of vertices', 'Number of edges', 'Number of components',
+    'Number of communities', 'Mean degree', 'Average path length',
+    'Global clustering', 'Local clustering', 'Diameter', 'Density',
+    'Size', 'Fraction', 'Q', 'Percolation threshold'
+  ),
+  color = c(
+    'cornflowerblue', 'mediumpurple', 'slateblue', 'maroon', 'navyblue', 'olivedrab',
+    'red4', 'lightpink4', 'red4', 'tomato4', 'lightsalmon', 'firebrick', 'seagreen', 'yellowgreen'
+  ),
+  stringsAsFactors = FALSE
+)
+```
+
+```{r, echo=FALSE, fig.height=4, fig.width=7}
+walk2(plot_specs$var, seq_along(plot_specs$var), function(varname, idx) {
+  p <- make_metric_plot(summary, varname, plot_specs$title[idx], plot_specs$ylab[idx], plot_specs$color[idx])
+  print(p)
+})
+```
+

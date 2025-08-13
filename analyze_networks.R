@@ -221,15 +221,205 @@ if (opt$make_html) {
   } else {
     rmd <- file.path(opt$out_dir, "net_report.Rmd")
     cat("---
-title: \"Network analysis report\"
+title: "Network analysis report"
 output: html_document
----\n\n", file = rmd)
-    cat("```{r, echo=FALSE}\nlibrary(data.table);
-        library(ggplot2)\n
-        summary <- fread('", file.path(opt$out_dir, "networks_summary.csv"), "')\n
-        print(head(summary))\n
-        # ejemplo: histograma de n_nodes\np <- ggplot(summary, aes(x = n_nodes)) + geom_histogram(bins=40) + theme_minimal()\n
-        print(p)\n```\n", file = rmd, append = TRUE)
+---
+
+```{r, echo=FALSE}
+library(data.table); library(ggplot2); library(ggpubr)
+summary <- fread('/datos/home/paulinapg/Multinetwork-classic-analysis/results/networks_summary.csv')
+print(head(summary))
+  
+```
+```{r, echo=FALSE}
+#Plot number of vertices 
+
+v_plot <- summary %>%
+  ggplot(aes(x = as.factor(network), y = n_nodes, group = 1)) +
+    geom_line() +
+    geom_point(color = "cornflowerblue", size = 2.5)+
+  labs(title = "Number of vertices (genes)",
+       x = "Networks",
+       y = "Number of vertices") +
+    scale_y_continuous(limits = c(max(summary$n_nodes)/4, max(summary$n_nodes))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  v_plot
+```
+
+```{r, echo=FALSE}
+#Plot number of edges 
+
+E_plot <- summary %>%
+  ggplot(aes(x = as.factor(network), y = n_edges, group = 1)) +
+    geom_line() +
+    geom_point(color = "mediumpurple", size = 2.5)+
+  labs(title = "Number of edges",
+       x = "Networks",
+       y = "Number of edges") +
+    scale_y_continuous(limits = c(max(summary$n_edges)/4, max(summary$n_edges))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+E_plot
+
+```
+
+```{r, echo=FALSE}
+#Plot number of components
+
+components_plot <- summary %>%
+  ggplot(aes(x = as.factor(network), y = n_components, group = 1)) +
+    geom_line() +
+    geom_point(color = "slateblue", size = 2.5)+
+  labs(title = "Number of components",
+       x = "Networks",
+       y = "Number of components") +
+    scale_y_continuous(limits = c(max(summary$n_components)/4, max(summary$n_components))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+components_plot
+```
+
+```{r, echo=FALSE}
+#Plot number of communities with INFOMAP
+
+components_INFOMAP_plot <- summary %>%
+  ggplot(aes(x = as.factor(network), y = n_communities, group = 1)) +
+    geom_line() +
+    geom_point(color = "navyblue", size = 2.5)+
+  labs(title = "Number of communities (INFOMAP)",
+       x = "Network",
+       y = "Number of communities") +
+    scale_y_continuous(limits = c(max(summary$n_communities)/4, max(summary$n_communities))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+components_INFOMAP_plot
+```
+
+```{r, echo=FALSE}
+#Plot average path length
+
+av_path.p <- summary %>%
+  ggplot(aes(x = as.factor(network), y = avg_path_len, group = 1)) +
+    geom_line() +
+    geom_point(color = "olivedrab", size = 2.5)+
+  labs(title = "Average path length",
+       x = "Network",
+       y = "Average path length") +
+    scale_y_continuous(limits = c(max(summary$avg_path_len)/4, max(summary$avg_path_len))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+av_path.p
+```
+
+```{r, echo=FALSE}
+#Plot global clustering coefficient
+
+global_clus.p <- summary %>%
+  ggplot(aes(x = as.factor(network), y = clustering_global, group = 1)) +
+    geom_line() +
+    geom_point(color = "red4", size = 2.5)+
+  labs(title = "Global clustering",
+       x = "Network",
+       y = "Global clustering") +
+    scale_y_continuous(limits = c(max(summary$clustering_global)/4, max(summary$clustering_global))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+global_clus.p
+```
+
+```{r, echo=FALSE}
+#Plot local clustering coefficient
+
+local_clus.p <- summary %>%
+  ggplot(aes(x = as.factor(network), y = clustering_local_mean, group = 1)) +
+    geom_line() +
+    geom_point(color = "lightpink4", size = 2.5)+
+  labs(title = "Global clustering coefficient",
+       x = "Network",
+       y = "Global clustering") +
+    scale_y_continuous(limits = c(max(summary$clustering_local_mean)/4, max(summary$clustering_local_mean))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+local_clus.p
+```
+
+```{r, echo=FALSE}
+#Plot Diameter
+
+diameter.p <-  summary %>%
+  ggplot(aes(x = as.factor(network), y = diameter, group = 1)) +
+    geom_line() +
+    geom_point(color = "red4", size = 2.5)+
+  labs(title = "Diameter",
+       x = "Network",
+       y = "Diameter") +
+    scale_y_continuous(limits = c(max(summary$diameter)/4, max(summary$diameter))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+diameter.p
+```
+
+```{r, echo=FALSE}
+#Plot Global density
+
+density.p <-  summary %>%
+  ggplot(aes(x = as.factor(network), y = global_density, group = 1)) +
+    geom_line() +
+    geom_point(color = "lightsalmon", size = 2.5)+
+  labs(title = "Global density",
+       x = "Network",
+       y = "Density") +
+    scale_y_continuous(limits = c(max(summary$global_density)/4, max(summary$global_density))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+density.p
+```
+
+```{r, echo=FALSE}
+#Plot size of giant component
+
+size_giant.p <- summary %>%
+  ggplot(aes(x = as.factor(network), y = size_giant_component, group = 1)) +
+    geom_line() +
+    geom_point(color = "firebrick", size = 2.5)+
+  labs(title = "Size of the giant component",
+       x = "Network",
+       y = "Size") +
+    scale_y_continuous(limits = c(max(summary$size_giant_component)/4, max(summary$size_giant_component))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+size_giant.p
+```
+
+```{r, echo=FALSE}
+#Plot percentage of genes in the max size comp
+
+Q_modularity.p <-summary %>%
+  ggplot(aes(x = as.factor(network), y = Q_modularity, group = 1)) +
+    geom_line() +
+    geom_point(color = "seagreen", size = 2.5)+
+  labs(title = "Q modularity",
+       x = "Network",
+       y = "Q") +
+    scale_y_continuous(limits = c(max(summary$Q_modularity)/4, max(summary$Q_modularity))) +
+  theme_pubclean() +
+  theme(legend.position = "none",
+      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+Q_modularity.p
+```
+
+", file = rmd, append = TRUE)
     rmarkdown::render(rmd, output_file = file.path(opt$out_dir, "net_report.html"), quiet = TRUE)
     cat("HTML report generated in:", file.path(opt$out_dir, "net_report.html"), "\n")
   }

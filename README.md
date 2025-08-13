@@ -1,6 +1,8 @@
 # Multinetwork-classic-analysis
 
 Sometimes we want to analyse many networks at once. This repository performs a classic topological analysis of networks in parallel for several networks.
+This script processes edge lists from networks and calculates global metrics, node metrics, and percolation simulations.
+It can be run from the console with different parameters to customise its operation.
 
 Here we calculate
 
@@ -41,14 +43,40 @@ Here we calculate
     
 # Packages needed
 
-igraph
-data.table
-future.apply
-ggplot2
-rmarkdown 
-tidyverse
+* igraph
+* data.table
+* future.apply
+* ggplot2
+* rmarkdown
+* tidyverse
 
 # How to run
 
+| Option            | Type       | Default                | Description                                            |
+| ----------------- | ---------- | ---------------------- | ------------------------------------------------------ |
+| `-i, --input_dir` | **texto**  | *(Mandatory )*        | Folder containing edge list files.                   |
+| `-p, --pattern`   | **texto**  | `.*\.(txt\|tsv\|csv)$` | Regular expression for selecting files.           |
+| `-o, --out_dir`   | **texto**  | `results`              | Folder where results are stored.                      |
+| `-w, --workers`   | **entero** | `2`                    | Number of parallel processes requested.                      |
+| `--per_node`      | **flag**   | `FALSE`                | If TRUE, save metrics per node (CSV per network). |
+| `--make_html`     | **flag**   | `FALSE`                | If TRUE, generate an HTML report with `rmarkdown`. |
+| `--percol_steps`  | **entero** | `51`                   | Number of steps in the percolation simulation. This greatly increases RAM usage, so proceed with caution.      |
+| `--seed`          | **entero** | `42`                   | Reproducibility seed                         |
+
+
+## Basic excecution
+
+Rscript script.R -i path/to/directory/ -o results_dir/
+
+## Example of running
+
+1. When data is in csv and you need 
+
 Rscript analyze_networks.R --input_dir data/edges --pattern "*.csv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
+
+## Help
+
+Rscript script.R --help
+
+
 

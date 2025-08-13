@@ -85,9 +85,13 @@ Rscript script.R -i path/to/directory/ -o results_dir/
 
 Rscript analyze_networks.R --input_dir data/edges --pattern "*.csv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
 
-2.When network is in graphml format with extension .graphml
+2. When network is in graphml format with extension .graphml
 
 Rscript analyze_networks.R --input_dir test_data/graphmls --pattern "*.graphml" --out_dir results_graphml --workers 4 --per_node TRUE --make_html TRUE
+
+3. When network is in adjacency matrix with extension .csv
+
+Rscript analyze_networks.R --input_dir test_data/adjacency_matrices --pattern "*.csv" --out_dir results_adj_m --workers 4 --per_node TRUE --make_html TRUE
 
 ## Note to consider
 

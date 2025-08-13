@@ -5,18 +5,24 @@
 #Usage:
 #Rscript analyze_networks.R --input_dir data/edges --pattern "*.tsv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
 
-if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
+if (!requireNamespace("pacman", quietly = FALSE)) install.packages("pacman")
 
-pacman::p_load(
-  igraph,
-  data.table,
-  future.apply,
-  ggplot2,
-  jsonlite,
-  stringr,
-  optparse, 
-  tools
+ok<- pacman::p_load(
+  "igraph",
+  "data.table",
+  "future.apply",
+  "ggplot2",
+  "jsonlite",
+  "stringr",
+  "optparse", 
+  "tools"
 )
+
+if (ok) {
+  message("All packages loaded correctly.")
+} else {
+  message("Some packages loaded correctly.")
+}
 
 #Define option list for inputs
 

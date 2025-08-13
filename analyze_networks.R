@@ -6,7 +6,7 @@
 
 if (!requireNamespace("pacman", quietly = FALSE)) install.packages("pacman")
 
-ok<- pacman::p_load(
+ok <- pacman::p_load(
   "igraph",
   "data.table",
   "future.apply",
@@ -18,10 +18,11 @@ ok<- pacman::p_load(
   "tools"
 )
 
-if (ok) {
+if (all(ok)) {
   message("All packages loaded correctly.")
 } else {
-  message("Some packages loaded correctly.")
+  stop("Some packages loaded correctly.: ",
+       paste(names(ok)[!ok], collapse = ", "))
 }
 
 #Define option list for inputs

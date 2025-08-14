@@ -87,7 +87,7 @@ read_network <- function(path) {
   }
   
   # Simplify graph (remove loops and multiple edges)
-  g <- simplify(as_undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
+  g <- simplify(igraph::as_undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
   return(g)
 }
 
@@ -153,7 +153,7 @@ analyze_one <- function(path) {
   cat("Processing:", nm, "\n")
   g <- tryCatch(read_network(path), error = function(e) { message(e); return(NULL) })
   if (is.null(g)) return(NULL)
-  g <- simplify(as_undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
+  g <- simplify(igraph::as_undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
   n <- vcount(g)
   m <- ecount(g)
   comp <- components(g)

@@ -54,7 +54,7 @@ The script automatically detects whether the file is:
     
 # Packages needed
 
-* igraph
+* igraph 2.1.4
 * data.table
 * future.apply
 * ggplot2

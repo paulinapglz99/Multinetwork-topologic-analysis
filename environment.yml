@@ -306,6 +306,7 @@ dependencies:
   - r-xts=0.13.1=r43h76d94ec_0
   - r-yaml=2.3.7=r43h76d94ec_0
   - r-zoo=1.8_12=r43h76d94ec_0
+  - r-pacman=0.5.1
   - readline=8.3=hc2a1206_0
   - referencing=0.30.2=py313h06a4308_0
   - requests=2.32.4=py313h06a4308_0

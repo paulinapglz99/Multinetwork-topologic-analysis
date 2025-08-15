@@ -65,16 +65,6 @@ The script automatically detects whether the file is:
 * tools
 * rmarkdown
 
-"igraph",
-  "data.table",
-  "future.apply",
-  "ggplot2",
-  "tidyverse",
-  "jsonlite",
-  "stringr",
-  "optparse", 
-  "tools"
-
 # How to run
 
 | Option            | Type       | Default                | Description                                            |
@@ -87,7 +77,6 @@ The script automatically detects whether the file is:
 | `--make_html`     | **flag**   | `FALSE`                | If TRUE, generate an HTML report with `rmarkdown`. |
 | `--percol_steps`  | **entero** | `51`                   | Number of steps in the percolation simulation. This greatly increases RAM usage, so proceed with caution.      |
 | `--seed`          | **entero** | `42`                   | Reproducibility seed                         |
-
 
 ## Basic excecution
 
@@ -111,10 +100,10 @@ Rscript analyze_networks.R --input_dir test_data/adjacency_matrices --pattern "*
 
 * When using adjacency matrices, don't use a column with names, only add a row with gene names at the top of the matrix. e.g
 
-V1,V2,V3
-0,0,0
-0,1,0
-0,0,1
+V1,V2,V3 \n
+0,0,0 \n
+0,1,0 \n
+0,0,1 \n
 
 * When using edgelists, don't add column name.
 * Don't mix network formats, use a directory for each format if necessary

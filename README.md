@@ -52,7 +52,7 @@ The script automatically detects whether the file is:
 
 * Handles loops and multiple edges automatically.
     
-# Packages needed
+# Packages needed 
 
 * igraph 2.1.4
 * data.table
@@ -62,8 +62,8 @@ The script automatically detects whether the file is:
 * jsonlite
 * stringr
 * optparse
-* tools
 * rmarkdown
+
 
 # How to run
 

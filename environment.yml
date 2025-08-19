@@ -22,6 +22,7 @@ dependencies:
 - certifi=2025.8.3=py313h06a4308_0
 - cffi=1.17.1=py313h1fdaa30_1
 - charset-normalizer=3.3.2=pyhd3eb1b0_0
+- cmake
 - curl=8.14.1=h14366f7_1
 - debugpy=1.8.11=py313h6a678d5_0
 - decorator=5.1.1=pyhd3eb1b0_0
@@ -77,4 +78,13 @@ dependencies:
 - r-vctrs=0.6.4=r43h884c59f_0
 - r-viridislite=0.4.2=r43h6115d3f_0
 - r-vroom=1.6.4=r43h884c59f_0
+- r-nloptr
+- r-lme4
+- r-car
+- r-rstatix
+- r-ggpubr
+- r-knitr
+- r-rmarkdown
+- r-htmlwidgets
+- r-polynom
 name: analyse_network_env

@@ -89,6 +89,9 @@ dependencies:
   - libmpdec=4.0.0=h5eee18b_0
   - libnghttp2=1.57.0=h2d74bed_0
   - libopenblas=0.3.29=ha39b09d_0
+  - liblzma=5.8.1
+  - libgcc=13
+  - zlib=1.2.11
   - libpng=1.6.39=h5eee18b_0
   - libsodium=1.0.18=h7b6447c_0
   - libssh2=1.11.1=h251f7ec_0

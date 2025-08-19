@@ -53,7 +53,7 @@ dependencies:
 - matplotlib-inline=0.1.6=py313h06a4308_0
 - mistune=3.1.2=py313h06a4308_0
 - notebook=7.4.4=py313h06a4308_0
-- openblas=0.3.30
+- openblas
 - pandoc=2.12=h06a4308_3
 - pillow=8.0.1=pyhd3eb1b0_0
 - pip=25.1=pyhc872135_2

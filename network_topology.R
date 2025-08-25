@@ -4,8 +4,8 @@
 #Usage:
 #Rscript analyze_networks.R --input_dir data/edges --pattern "*.tsv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
 
-if (!requireNamespace("pacman", quietly = F)) install.packages("pacman", repos = "https://cloud.r-project.org")
-if (!requireNamespace("optparse", quietly = F)) install.packages("optparse", repos = "https://cloud.r-project.org")
+if (!requireNamespace("pacman", quietly = FALSE)) install.packages("pacman", repos = "https://cloud.r-project.org")
+if (!requireNamespace("optparse", quietly = FALSE)) install.packages("optparse", repos = "https://cloud.r-project.org")
 
 ok <- pacman::p_load(
   "igraph",

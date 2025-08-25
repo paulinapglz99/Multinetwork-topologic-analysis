@@ -4,8 +4,8 @@
 #Usage:
 #Rscript analyze_networks.R --input_dir data/edges --pattern "*.tsv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
 
-if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman", repos = "https://cloud.r-project.org")
-if (!requireNamespace("optparse", quietly = TRUE)) install.packages("optparse", repos = "https://cloud.r-project.org")
+if (!requireNamespace("pacman", quietly = F)) install.packages("pacman", repos = "https://cloud.r-project.org")
+if (!requireNamespace("optparse", quietly = F)) install.packages("optparse", repos = "https://cloud.r-project.org")
 
 ok <- pacman::p_load(
   "igraph",
@@ -29,14 +29,15 @@ if (all(ok)) {
 #Define option list for inputs
 
 option_list <- list(
-  make_option(c("-i","--input_dir"), type="character", default=NULL, help="Folder with edge list files"),
+  make_option(c("-i","--input_dir"), type="character", default=NULL, help="Folder with files"),
   make_option(c("-p","--pattern"), type="character", default=".*\\.(txt|tsv|csv|graphml)$", help="Pattern regex for files"),
   make_option(c("-o","--out_dir"), type="character", default="results", help="Output directory"),
   make_option(c("-w","--workers"), type="integer", default=2, help="Number of parallel workers"),
   make_option(c("--per_node"), action="store_true", default=FALSE, help="Save metrics per node (CSV per network)"),
   make_option(c("--make_html"), action="store_true", default=FALSE, help="Generate aggregate HTML report (uses rmarkdown)"),
   make_option(c("--percol_steps"), type="integer", default=51, help="Number of steps in percolation simulation (e.g. 51 -> 0.2%, 4%, ...)"),
-  make_option(c("--seed"), type="integer", default=42, help="Seed for reproducibility")
+  make_option(c("--seed"), type="integer", default=42, help="Seed for reproducibility"),
+  make_option(c("--type"), type="character", default="auto", help="Input format: 'auto' (default), 'edgelist' or 'adjacency'")
 )
 
 opt <- parse_args(OptionParser(option_list = option_list))
@@ -48,10 +49,9 @@ dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
 files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)
 if (length(files)==0) stop("No files matching the pattern were found in input_dir.")
 
-#Helper function: reads edge list (flexible to 2 or 3 columns: source, target[,weight])
-
-# Helper function: read a network from CSV/TSV/GraphML
-read_network <- function(path) {
+#Helper function: read a network from CSV/TSV/GraphML
+read_network <- function(path, type = c("auto", "edgelist", "adjacency")) {
+  type <- match.arg(type)
   ext <- tolower(tools::file_ext(path))
   
   if (ext == "graphml") {
@@ -60,27 +60,37 @@ read_network <- function(path) {
     
   } else if (ext %in% c("csv", "tsv", "txt")) {
     sep <- ifelse(ext == "tsv", "\t", ",")
-    df <- fread(path, sep = sep, header = FALSE, data.table = FALSE)
+    df <- fread(path, sep = sep, header = TRUE, data.table = FALSE)
     
-    # Check if first row contains non-numeric column names (adjacency matrix)
-    if (!all(sapply(df[1, ], is.numeric))) {
-      # First row = column names
-      colnames(df) <- as.character(df[1, ])
-      df <- df[-1, , drop = FALSE]
+    if (type == "adjacency") {
+      # Treat as adjacency matrix
       mat <- as.matrix(df)
       storage.mode(mat) <- "numeric"
       rownames(mat) <- colnames(mat)
-      # Create weighted undirected graph
       g <- graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
-    } else if (ncol(df) >= 2) {
-      # Treat as edgelist: 2 or 3 columns
+      
+    } else if (type == "edgelist") {
+      # Always treat as edgelist: first two cols = nodes, third (if exists) = weight
       if (ncol(df) >= 3) {
-        g <- graph_from_data_frame(df[, 1:3], directed = FALSE)
+        g <- graph_from_data_frame(df[, 1:3, drop = FALSE], directed = FALSE)
       } else {
-        g <- graph_from_data_frame(df[, 1:2], directed = FALSE)
+        g <- graph_from_data_frame(df[, 1:2, drop = FALSE], directed = FALSE)
       }
-    } else {
-      stop("Cannot interpret the file: ", path)
+      
+    } else if (type == "auto") {
+      # Heuristic: check if first row is numeric → adjacency
+      if (!all(sapply(df[1, ], is.numeric))) {
+        mat <- as.matrix(df)
+        storage.mode(mat) <- "numeric"
+        rownames(mat) <- colnames(mat)
+        g <- graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
+      } else {
+        if (ncol(df) >= 3) {
+          g <- graph_from_data_frame(df[, 1:3, drop = FALSE], directed = FALSE)
+        } else {
+          g <- graph_from_data_frame(df[, 1:2, drop = FALSE], directed = FALSE)
+        }
+      }
     }
     
   } else {
@@ -88,7 +98,8 @@ read_network <- function(path) {
   }
   
   # Simplify graph (remove loops and multiple edges)
-  g <- simplify(igraph::as_undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
+  g <- simplify(igraph::as_undirected(g, mode = "collapse"),
+                remove.multiple = TRUE, remove.loops = TRUE)
   return(g)
 }
 

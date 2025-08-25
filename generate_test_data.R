@@ -13,8 +13,8 @@ dirs <- list(
 )
 lapply(dirs, dir.create, recursive = TRUE, showWarnings = FALSE)
 
-# Generate 5 networks: 3 Erdos-Renyi, 2 Preferential Attachment
-for(i in 1:5) {
+# Generate 5 networks: 3 Erdos-Renyi, 7 Preferential Attachment
+for(i in 1:10) {
   if (i <= 3) {
     # Erdos-Renyi G(n=100, p=0.05)
     g <- sample_gnp(100, 0.05, directed = FALSE)

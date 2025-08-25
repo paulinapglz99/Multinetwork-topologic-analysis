@@ -1,4 +1,4 @@
-# Multinetwork-classic-analysis
+# Multinetwork-topology-analysis
 
 Sometimes we want to analyse many networks at once. This repository performs a classic topological analysis of networks in parallel for several networks.
 This script processes edge lists from networks and calculates global metrics, node metrics, and percolation simulations.
@@ -77,6 +77,7 @@ The script automatically detects whether the file is:
 | `--make_html`     | **flag**   | `FALSE`                | If TRUE, generate an HTML report with `rmarkdown`. |
 | `--percol_steps`  | **entero** | `51`                   | Number of steps in the percolation simulation. This greatly increases RAM usage, so proceed with caution.      |
 | `--seed`          | **entero** | `42`                   | Reproducibility seed                         |
+| `--type`          | **texto** | `auto`                   | Graph format (Input format: 'auto' (default), 'edgelist' or 'adjacency)                       |
 
 ## Basic excecution
 

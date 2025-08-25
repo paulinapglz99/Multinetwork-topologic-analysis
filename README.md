@@ -47,7 +47,7 @@ It supports different input formats (GraphML, edge lists, adjacency matrices) an
 
 ## Requirements
 
-- [R (≥ 4.0.0)](https://cran.r-project.org/)
+- [R (≥ 4.5.0)](https://cran.r-project.org/)
 - Packages:
   - `igraph (2.1.4)`
   - `data.table`
@@ -86,12 +86,13 @@ Rscript analyze_networks.R [options]
 | ----------------- | ------- | ---------------------- | --------------------------------------------------------------------------- |
 | `-i, --input_dir` | text    | *(mandatory)*          | Folder containing edge list / adjacency / GraphML files.                    |
 | `-p, --pattern`   | text    | `.*\.(txt\|tsv\|csv)$` | Regular expression for selecting files.                                     |
-| `-o, --out_dir`   | text    | `results`              | Folder where results are stored.                                            |
-| `-w, --workers`   | integer | `2`                    | Number of parallel processes.                                               |
+| `-o, --out_dir`   | text    | `results`              | Folder where results are stored. Script writes it automatically if it doesn't exist|
+| `-w, --workers`   | integer | `2`                    | Number of parallel processes (threads to use).                                               |
 | `--per_node`      | flag    | `FALSE`                | If `TRUE`, saves per-node metrics (CSV per network).                        |
 | `--make_html`     | flag    | `FALSE`                | If `TRUE`, generates an HTML report with `rmarkdown`.                       |
 | `--percol_steps`  | integer | `51`                   | Number of steps for percolation simulation (high RAM usage, use with care). |
 | `--seed`          | integer | `42`                   | Random seed for reproducibility.                                            |
+| `--type`          | text | `auto`                   | Format type of the input network ('auto' (default), 'graphml','edgelist' or 'adjacency')|
 
 Show help:
 

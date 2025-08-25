@@ -29,12 +29,10 @@ if (all(ok)) {
 
 option_list <- list(
   optparse::make_option(c("-i","--input_dir"), type="character", help="Carpeta con redes"),
-  optparse::make_option(c("-p","--pattern"), type="character", default=".*\\.(csv|tsv|txt|graphml)$",
-                        help="File regex (default: .*\\.(csv|tsv|txt|graphml)$)"),
+  optparse::make_option(c("-p","--pattern"), type="character", default=".*\\.(csv|tsv|txt|graphml)$", help="File regex (default: .*\\.(csv|tsv|txt|graphml)$)"),
   optparse::make_option(c("-o","--out_dir"), type="character", default="results_jaccard", help="Output directory"),
   optparse::make_option(c("-w","--workers"), type="integer", default=4, help="Number of parallel workers"),
-  optparse::make_option(c("-e","--element"), type="character", default="edges",
-                        help="Element to compare: “edges” or “nodes” (default: edges)"),
+  optparse::make_option(c("-e","--element"), type="character", default="edges", help="Element to compare: “edges” or “nodes” (default: edges)"),
   optparse::make_option(c("--make_html"), action="store_true", default=FALSE, help="Create HTML report"),
   optparse::make_option(c("--seed"), type="integer", default=42, help="Seed")
 )
@@ -100,70 +98,7 @@ files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)
 if (length(files) < 2) stop("Se necesitan al menos 2 archivos para comparar.")
 net_names <- basename(files)
 
-
 ############################
-
-
-
-
-#!/usr/bin/env Rscript
-
-# ========= DEPENDENCIAS (instalar SOLO si faltan) =========
-need_pkg <- function(pkgs) {
-  for (p in pkgs) {
-    if (!requireNamespace(p, quietly = TRUE)) install.packages(p, repos = "https://cloud.r-project.org")
-    suppressPackageStartupMessages(library(p, character.only = TRUE))
-  }
-}
-need_pkg(c("optparse","data.table","future.apply","igraph","ggplot2","tools"))
-
-# ========= PARÁMETROS CLI =========
-option_list <- list(
-  optparse::make_option(c("-i","--input_dir"), type="character", help="Carpeta con redes"),
-  optparse::make_option(c("-p","--pattern"), type="character", default=".*\\.(csv|tsv|txt|graphml)$",
-                        help="Regex de archivos (por defecto: .*\\.(csv|tsv|txt|graphml)$)"),
-  optparse::make_option(c("-o","--out_dir"), type="character", default="results_jaccard", help="Directorio de salida"),
-  optparse::make_option(c("-w","--workers"), type="integer", default=4, help="Número de workers paralelos"),
-  optparse::make_option(c("-e","--element"), type="character", default="edges",
-                        help="Elemento a comparar: 'edges' o 'nodes' (default: edges)"),
-  optparse::make_option(c("--make_html"), action="store_true", default=FALSE, help="Generar reporte HTML"),
-  optparse::make_option(c("--seed"), type="integer", default=42, help="Semilla")
-)
-opt <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
-if (is.null(opt$input_dir)) stop("Debe especificar --input_dir")
-dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
-set.seed(opt$seed)
-
-# ========= TU LECTOR (NO MODIFICAR) =========
-read_network <- function(path) {
-  ext <- tolower(tools::file_ext(path))
-  if (ext == "graphml") {
-    g <- igraph::read_graph(path, format = "graphml")
-  } else if (ext %in% c("csv", "tsv", "txt")) {
-    sep <- ifelse(ext == "tsv", "\t", ",")
-    df <- data.table::fread(path, sep = sep, header = FALSE, data.table = FALSE)
-    if (!all(sapply(df[1, ], is.numeric))) {
-      colnames(df) <- as.character(df[1, ])
-      df <- df[-1, , drop = FALSE]
-      mat <- as.matrix(df); storage.mode(mat) <- "numeric"
-      rownames(mat) <- colnames(mat)
-      g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
-    } else if (ncol(df) >= 2) {
-      if (ncol(df) >= 3) g <- igraph::graph_from_data_frame(df[, 1:3], directed = FALSE) else
-        g <- igraph::graph_from_data_frame(df[, 1:2], directed = FALSE)
-    } else stop("Cannot interpret the file: ", path)
-  } else stop("Unsupported file format: ", ext)
-  g <- igraph::simplify(igraph::as_undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
-  return(g)
-}
-
-# ========= UTILIDADES =========
-# Jaccard simple (conjuntos a y b)
-jaccard_simplex <- function(a, b) {
-  if (length(a) == 0 && length(b) == 0) return(1)   # ambos vacíos -> similitud máxima
-  if (length(a) == 0 || length(b) == 0) return(0)   # uno vacío -> 0
-  length(intersect(a, b)) / length(union(a, b))
-}
 
 # Serializar aristas no dirigidas a pares canonizados "u||v"
 edge_set <- function(g) {

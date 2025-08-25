@@ -51,44 +51,52 @@ if (length(files)==0) stop("No files matching the pattern were found in input_di
 
 #Helper function: read a network from CSV/TSV/GraphML
 read_network <- function(path, type = c("auto", "edgelist", "adjacency")) {
-  type <- match.arg(type)
+  type <- match.arg(type)  #From the opt parser
+  
   ext <- tolower(tools::file_ext(path))
   
   if (ext == "graphml") {
-    # GraphML file
-    g <- read_graph(path, format = "graphml")
+    g <- igraph::read_graph(path, format = "graphml")
     
   } else if (ext %in% c("csv", "tsv", "txt")) {
     sep <- ifelse(ext == "tsv", "\t", ",")
-    df <- fread(path, sep = sep, header = TRUE, data.table = FALSE)
+    df <- data.table::fread(path, sep = sep, header = TRUE, data.table = FALSE)
     
-    if (type == "adjacency") {
-      # Treat as adjacency matrix
-      mat <- as.matrix(df)
-      storage.mode(mat) <- "numeric"
-      rownames(mat) <- colnames(mat)
-      g <- graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
-      
-    } else if (type == "edgelist") {
-      # Always treat as edgelist: first two cols = nodes, third (if exists) = weight
+    #EDGELIST
+    if (type == "edgelist") {
       if (ncol(df) >= 3) {
-        g <- graph_from_data_frame(df[, 1:3, drop = FALSE], directed = FALSE)
+        g <- igraph::graph_from_data_frame(df[, 1:3], directed = FALSE)
       } else {
-        g <- graph_from_data_frame(df[, 1:2, drop = FALSE], directed = FALSE)
+        g <- igraph::graph_from_data_frame(df[, 1:2], directed = FALSE)
       }
       
+      #ADJACENCY MATRIX
+    } else if (type == "adjacency") {
+      # la primera columna NO puede ser rownames si hay duplicados
+      rownames(df) <- make.unique(as.character(df[, 1]))  
+      df <- df[, -1, drop = FALSE]
+      mat <- as.matrix(df)
+      storage.mode(mat) <- "numeric"
+      g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
+      
+      #AUTO-DETECT
     } else if (type == "auto") {
-      # Heuristic: check if first row is numeric → adjacency
-      if (!all(sapply(df[1, ], is.numeric))) {
+      #If ALL columns (except the first) are numeric, I treat it as adjacency
+      looks_like_adj <- all(sapply(df[,-1, drop=FALSE], is.numeric))
+      
+      if (looks_like_adj) {
+        rownames(df) <- make.unique(as.character(df[, 1]))  
+        df <- df[, -1, drop = FALSE]
         mat <- as.matrix(df)
         storage.mode(mat) <- "numeric"
-        rownames(mat) <- colnames(mat)
-        g <- graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
+        g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
+        
       } else {
+        #edge list: only the first 2 as nodes and optionally the 3rd as weight
         if (ncol(df) >= 3) {
-          g <- graph_from_data_frame(df[, 1:3, drop = FALSE], directed = FALSE)
+          g <- igraph::graph_from_data_frame(df[, 1:3], directed = FALSE)
         } else {
-          g <- graph_from_data_frame(df[, 1:2, drop = FALSE], directed = FALSE)
+          g <- igraph::graph_from_data_frame(df[, 1:2], directed = FALSE)
         }
       }
     }
@@ -97,32 +105,34 @@ read_network <- function(path, type = c("auto", "edgelist", "adjacency")) {
     stop("Unsupported file format: ", ext)
   }
   
-  # Simplify graph (remove loops and multiple edges)
-  g <- simplify(igraph::as_undirected(g, mode = "collapse"),
-                remove.multiple = TRUE, remove.loops = TRUE)
+  #Final treatment, no bucles, loops
+  g <- igraph::simplify(igraph::as_undirected(g, mode = "collapse"),
+                        remove.multiple = TRUE, remove.loops = TRUE)
+  
   return(g)
 }
+#sheesh
 
-# Percolation threshold estimator (fast approximate)
-# Strategy: for a series of removal fractions f in [0, fmax], remove fraction of nodes (random or targeted by degree)
-# mode: ‘random’ or ‘targeted’. Defines how nodes are removed:
+#Percolation threshold estimator (fast approximate)
+#Strategy: for a series of removal fractions f in [0, fmax], remove fraction of nodes (random or targeted by degree)
+#mode: ‘random’ or ‘targeted’. Defines how nodes are removed:
 #   
-# ‘random’: nodes removed at random.
+#‘random’: nodes removed at random.
 # 
-# ‘targeted’: nodes removed in descending order of degree (the most connected first).
-# and compute giant component size fraction. Returns first f where GCC < threshold_frac (or NA).
-# steps: number of node fraction values to test between 0 and 1 (default 51).
+#‘targeted’: nodes removed in descending order of degree (the most connected first).
+#and compute giant component size fraction. Returns first f where GCC < threshold_frac (or NA).
+#steps: number of node fraction values to test between 0 and 1 (default 51).
 # 
-# threshold_frac: fraction of the original graph size below which we consider the giant component to have collapsed (default 0.5, i.e., less than 50%).
+#threshold_frac: fraction of the original graph size below which we consider the giant component to have collapsed (default 0.5, i.e., less than 50%).
 # 
-# trials: for "random" mode only: how many times to repeat the random removal to stabilize the result (default 3).
+#trials: for "random" mode only: how many times to repeat the random removal to stabilize the result (default 3).
 
 percolation_threshold <- function(g, mode = c("random","targeted"), steps = 51, threshold_frac = 0.5, trials = 3) {
   mode <- match.arg(mode)
   n <- vcount(g)
   if (n == 0) return(NA_real_)
   fracs <- seq(0, 1, length.out = steps)
-  # For speed, limit to fmax 0.6 typically
+  #For speed, limit to fmax 0.6 typically
   fracs <- fracs[fracs <= 0.6]
   detect_f <- function(g) {
     if (mode == "random") {
@@ -136,7 +146,7 @@ percolation_threshold <- function(g, mode = c("random","targeted"), steps = 51, 
         if (gcc < threshold_frac) return(f)
       }
     } else if (mode == "targeted") {
-      # remove highest-degree nodes cumulatively (fast: compute degrees once, remove top k)
+      #remove highest-degree nodes cumulatively (fast: compute degrees once, remove top k)
       degs <- degree(g)
       ord <- order(degs, decreasing = TRUE)
       for (f in fracs) {
@@ -152,7 +162,7 @@ percolation_threshold <- function(g, mode = c("random","targeted"), steps = 51, 
   }
   if (mode == "random") {
     res <- replicate(trials, detect_f(g))
-    # choose median of trials
+    #choose median of trials
     return(median(res, na.rm = TRUE))
   } else {
     return(detect_f(g))

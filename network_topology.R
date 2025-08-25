@@ -197,7 +197,7 @@ analyze_one <- function(path) {
   kcore <- coreness(g)
   kcore_max <- max(kcore)
   pr <- page_rank(g)$vector
-  pr_norm <- (pr- min(pr_raw)) / (max(pr) - min(pr))
+  pr_norm <- (pr- min(pr)) / (max(pr) - min(pr))
   pr_top <- sort(pr, decreasing = TRUE)[1:min(5, length(pr))]
   
   #Detecting communities with Infomap (error handling)

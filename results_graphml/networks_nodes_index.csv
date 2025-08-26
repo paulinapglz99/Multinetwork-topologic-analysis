@@ -1,6 +1,11 @@
 file,node_table
-network_1.graphml,results_graphml/network_1_nodes_summary.csv
-network_2.graphml,results_graphml/network_2_nodes_summary.csv
-network_3.graphml,results_graphml/network_3_nodes_summary.csv
-network_4.graphml,results_graphml/network_4_nodes_summary.csv
-network_5.graphml,results_graphml/network_5_nodes_summary.csv
+network_1.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_1_nodes_summary.csv
+network_10.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_10_nodes_summary.csv
+network_2.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_2_nodes_summary.csv
+network_3.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_3_nodes_summary.csv
+network_4.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_4_nodes_summary.csv
+network_5.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_5_nodes_summary.csv
+network_6.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_6_nodes_summary.csv
+network_7.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_7_nodes_summary.csv
+network_8.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_8_nodes_summary.csv
+network_9.graphml,/home/paulinapg/Multinetwork-topologic-analysis/results_graphml/network_9_nodes_summary.csv

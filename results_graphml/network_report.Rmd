@@ -16,7 +16,7 @@ make_metric_plot <- function(df, metric, title, ylab, color) {
     geom_line() +
     geom_point(color = color, size = 2.5) +
     labs(title = title, x = 'Network', y = ylab) +
-    scale_y_continuous(limits = c(max(df[[metric]])/5, max(df[[metric]]))) +
+    scale_y_continuous(limits = c(min(df[[metric]]), max(df[[metric]]))) +
     theme_pubclean() +
     theme(legend.position = 'none', axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))
 }

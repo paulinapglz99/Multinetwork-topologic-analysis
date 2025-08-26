@@ -100,7 +100,6 @@ Show help:
 Rscript analyze_networks.R --help
 ```
 
-<<<<<<< HEAD
 * Handles loops and multiple edges automatically.
     
 # Packages needed 
@@ -120,15 +119,15 @@ Rscript analyze_networks.R --help
 
 | Option            | Type       | Default                | Description                                            |
 | ----------------- | ---------- | ---------------------- | ------------------------------------------------------ |
-| `-i, --input_dir` | **texto**  | *(Mandatory )*        | Folder containing edge list files.                   |
-| `-p, --pattern`   | **texto**  | `.*\.(txt\|tsv\|csv)$` | Regular expression for selecting files.           |
-| `-o, --out_dir`   | **texto**  | `results`              | Folder where results are stored.                      |
-| `-w, --workers`   | **entero** | `2`                    | Number of parallel processes requested.                      |
+| `-i, --input_dir` | **text**  | *(Mandatory)*        | Folder containing edge list files.                   |
+| `-p, --pattern`   | **text**  | `.*\.(txt\|tsv\|csv)$` | Regular expression for selecting files.           |
+| `-o, --out_dir`   | **text**  | `results`              | Folder where results are stored.                      |
+| `-w, --workers`   | **integer** | `2`                    | Number of parallel processes requested.                      |
 | `--per_node`      | **flag**   | `FALSE`                | If TRUE, save metrics per node (CSV per network). |
 | `--make_html`     | **flag**   | `FALSE`                | If TRUE, generate an HTML report with `rmarkdown`. |
-| `--percol_steps`  | **entero** | `51`                   | Number of steps in the percolation simulation. This greatly increases RAM usage, so proceed with caution.      |
-| `--seed`          | **entero** | `42`                   | Reproducibility seed                         |
-| `--type`          | **texto** | `auto`                   | Graph format (Input format: 'auto' (default), 'edgelist' or 'adjacency)                       |
+| `--percol_steps`  | **integer** | `51`                   | Number of steps in the percolation simulation. This greatly increases RAM usage, so proceed with caution.      |
+| `--seed`          | **integer** | `42`                   | Reproducibility seed                         |
+| `--type`          | **text** | `auto`                   | Graph format (Input format: 'auto' (default), 'edgelist' or 'adjacency).Graphml is detected automatically.    |
 =======
 ---
 
@@ -145,7 +144,6 @@ Rscript analyze_networks.R \
   --per_node TRUE \
   --make_html TRUE
 ```
->>>>>>> 873b586536dd59adab1cf10a98b2917f6c697210
 
 ### 2. GraphML format
 
@@ -156,7 +154,8 @@ Rscript analyze_networks.R \
   --out_dir results_graphml \
   --workers 4 \
   --per_node TRUE \
-  --make_html TRUE
+  --make_html TRUE \
+  --type graphml
 ```
 
 ### 3. Adjacency matrix in `.csv`
@@ -169,6 +168,7 @@ Rscript analyze_networks.R \
   --workers 4 \
   --per_node TRUE \
   --make_html TRUE
+  --type adjacency
 ```
 
 ---
@@ -190,7 +190,7 @@ Rscript analyze_networks.R \
 
 * **Edge lists**:
 
-  * Do **not** include a header row.
+  * Include a header row.
 
 * **Mixed formats**:
 
@@ -215,19 +215,5 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-## Summary of Improvements
-
-* **Added project description** at the top with badges for license and R support.
-* **Reorganized sections** into Features, Metrics, Requirements, Usage, Examples, Notes, Contributing, License.
-* **Added installation instructions** for required R packages.
-* **Formatted metrics** into structured lists (Global, Local, Mesoscale).
-* **Improved clarity** in examples (line breaks, code formatting).
-* **Linked** to CRAN and GitHub issues for references.
-* **Added placeholders** where details may need to be filled (e.g., LICENSE file link).
-
-This structure follows [GitHub’s best practices](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes) and common patterns in open source README files.
-
 ```
 
-Would you like me to also add a **"Project Structure"** section (explaining what each file/script does) or keep it minimal?
-```

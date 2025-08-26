@@ -37,7 +37,7 @@ option_list <- list(
   make_option(c("--make_html"), action="store_true", default=FALSE, help="Generate aggregate HTML report (uses rmarkdown)"),
   make_option(c("--percol_steps"), type="integer", default=51, help="Number of steps in percolation simulation (e.g. 51 -> 0.2%, 4%, ...)"),
   make_option(c("--seed"), type="integer", default=42, help="Seed for reproducibility"),
-  make_option(c("--type"), type="character", default="auto", help="Input format: 'auto' (default), 'edgelist' or 'adjacency'")
+  make_option(c("--type"), type="character", default="auto", help="Input format: 'auto' (default), 'edgelist' or 'adjacency'. Graphml is detected automatically. ")
 )
 
 opt <- parse_args(OptionParser(option_list = option_list))
@@ -50,7 +50,9 @@ files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)
 if (length(files)==0) stop("No files matching the pattern were found in input_dir.")
 
 #Helper function: read a network from CSV/TSV/GraphML
-read_network <- function(path, type = c("auto", "edgelist", "adjacency")) {
+read_network <- function(path, type = opt$type) {
+  message("DEBUG - type recibido: ", paste0(type, collapse = ","))
+  
   type <- match.arg(type)  #From the opt parser
   
   ext <- tolower(tools::file_ext(path))
@@ -72,12 +74,10 @@ read_network <- function(path, type = c("auto", "edgelist", "adjacency")) {
       
       #ADJACENCY MATRIX
     } else if (type == "adjacency") {
-      # la primera columna NO puede ser rownames si hay duplicados
-      rownames(df) <- make.unique(as.character(df[, 1]))  
-      df <- df[, -1, drop = FALSE]
       mat <- as.matrix(df)
       storage.mode(mat) <- "numeric"
-      g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
+      g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected", 
+                                               weighted = TRUE)
       
       #AUTO-DETECT
     } else if (type == "auto") {
@@ -89,7 +89,8 @@ read_network <- function(path, type = c("auto", "edgelist", "adjacency")) {
         df <- df[, -1, drop = FALSE]
         mat <- as.matrix(df)
         storage.mode(mat) <- "numeric"
-        g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
+        g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected",
+                                                 weighted = TRUE)
         
       } else {
         #edge list: only the first 2 as nodes and optionally the 3rd as weight
@@ -316,7 +317,7 @@ if (opt$make_html) {
     "    geom_line() +\n",
     "    geom_point(color = color, size = 2.5) +\n",
     "    labs(title = title, x = 'Network', y = ylab) +\n",
-    "    scale_y_continuous(limits = c(max(df[[metric]])/5, max(df[[metric]]))) +\n",
+    "    scale_y_continuous(limits = c(min(df[[metric]]), max(df[[metric]]))) +\n",
     "    theme_pubclean() +\n",
     "    theme(legend.position = 'none', axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))\n",
     "}\n",

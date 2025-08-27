@@ -143,6 +143,7 @@ Rscript analyze_networks.R \
   --workers 4 \
   --per_node TRUE \
   --make_html TRUE
+  --type edgelist
 ```
 
 ### 2. GraphML format
@@ -150,12 +151,11 @@ Rscript analyze_networks.R \
 ```bash
 Rscript analyze_networks.R \
   --input_dir test_data/graphmls \
-  --pattern "*.graphml" \
+  --pattern ".*\\.graphml$" \
   --out_dir results_graphml \
   --workers 4 \
   --per_node TRUE \
-  --make_html TRUE \
-  --type graphml
+  --make_html TRUE
 ```
 
 ### 3. Adjacency matrix in `.csv`
@@ -163,7 +163,7 @@ Rscript analyze_networks.R \
 ```bash
 Rscript analyze_networks.R \
   --input_dir test_data/adjacency_matrices \
-  --pattern "*.csv" \
+  --pattern ".*\\.csv$" \
   --out_dir results_adj_m \
   --workers 4 \
   --per_node TRUE \

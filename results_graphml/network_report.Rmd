@@ -7,7 +7,7 @@ output: html_document
 if (!requireNamespace('pacman', quietly = TRUE)) install.packages('pacman')
 pacman::p_load(data.table, ggplot2, ggpubr, purrr)
 summary <- fread('networks_summary.csv')
-print(head(summary))
+print(summary)
 ```
 
 ```{r, echo=FALSE}
@@ -20,44 +20,6 @@ make_metric_plot <- function(df, metric, title, ylab, color) {
     theme_pubclean() +
     theme(legend.position = 'none', axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))
 }
-```
-
-```{r, echo=FALSE}
-deg_dists <- fread('networks_degree_dist.csv')
-deg_dists <- merge(deg_dists, summary[, .(file, gamma_exponent)], by.x = 'network', by.y = 'file', all.x = TRUE)
-```
-
-```{r, echo=FALSE, fig.width=6, fig.height=5}
-plot_degree <- function(df, net_name) {
-  gamma_val <- unique(df$gamma_exponent)
-  ggplot(df, aes(x = degree, y = Prob)) +
-    geom_point(color = 'blue', size = 2, alpha = 0.8) +
-    scale_x_log10() + scale_y_log10() +
-    labs(x = expression(log(k)), y = expression(log(p(k))),
-         subtitle = paste0(net_name, '\nDegree distribution')) +
-    geom_smooth(method = 'lm', se = FALSE, color = 'black', linetype = 'dashed') +
-    annotate('text', x = min(df$degree), y = max(df$Prob), hjust = 0, vjust = 1,
-             label = paste0('γ = ', round(gamma_val, 2)), size = 4) +
-    theme_minimal(base_size = 14)
-}
-```
-
-```{r, echo=FALSE, results='asis'}
-nets <- unique(deg_dists$network)
-for (net in nets) {
-  df <- deg_dists[network == net]
-  print(plot_degree(df, net))
-}
-```
-
-```{r, echo=FALSE, fig.width=7, fig.height=6}
-ggplot(deg_dists, aes(x = degree, y = Prob, color = network)) +
-  geom_point(size = 2, alpha = 0.7) +
-  geom_smooth(method = 'lm', se = FALSE, linetype = 'dashed', size = 1) +
-  scale_x_log10() + scale_y_log10() +
-  labs(x = expression(log(k)), y = expression(log(p(k))),
-       title = 'All networks degree distribution') +
-  theme_minimal(base_size = 14)
 ```
 
 ```{r, echo=FALSE}

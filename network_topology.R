@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
 
 #network_topology.R
-#Usage:
-#Rscript analyze_networks.R --input_dir data/edges --pattern "*.tsv" --out_dir results --workers 4 --per_node TRUE --make_html TRUE
+#Usage: https://github.com/paulinapglz99/Multinetwork-topologic-analysis
+#
 
 if (!requireNamespace("pacman", quietly = FALSE)) install.packages("pacman", repos = "https://cloud.r-project.org")
 if (!requireNamespace("optparse", quietly = FALSE)) install.packages("optparse", repos = "https://cloud.r-project.org")
@@ -201,25 +201,6 @@ analyze_one <- function(path) {
   pr_norm <- (pr- min(pr)) / (max(pr) - min(pr))
   pr_top <- sort(pr, decreasing = TRUE)[1:min(5, length(pr))]  #Adjusting the degree distribution to estimate the gamma exponent
   
-  #Degree distribution dataframe
-    degs.df <- data.frame(degree = degs) %>%
-    dplyr::count(degree, name = "freq") %>%
-    dplyr::mutate(prob = freq / sum(freq)) %>%
-    dplyr::filter(degree > 1, prob > 0)
-  
-  deg_dist <- data.table(
-    network = nm,
-    degree = degs.df$degree,
-    Prob = degs.df$prob
-  )
-  
-  if (nrow(degs.df) > 1) {
-    fit <- lm(log(prob) ~ log(degree), data = degs.df)
-    gamma_val <- -coef(fit)[["log(degree)"]]
-  } else {
-    gamma_val <- NA_real_
-  }
-  
   #Detecting communities with Infomap (error handling)
   comm_infomap <- tryCatch(
     cluster_infomap(g),
@@ -258,8 +239,8 @@ analyze_one <- function(path) {
     perc_random_50 = perc_random,
     n_communities = length(comm_sizes),        
     largest_community_size = largest_comm_size, 
-    largest_community_id = largest_comm_id,
-    gamma_exponent = gamma_val  #gamma value
+    largest_community_id = largest_comm_id
+    #gamma_exponent = gamma_val  #gamma value
   )
   
   node_table_path <- NA_character_
@@ -281,8 +262,9 @@ analyze_one <- function(path) {
   
   rm(g, g_giant, comp); gc(verbose = FALSE)
   return(list(summary = summary_row,
-              node_table = node_table_path,
-              degree_dist = deg_dist))
+              node_table = node_table_path
+              #degree_dist = deg_dist
+              ))
 }
 
 
@@ -294,11 +276,6 @@ results <- future_lapply(files, FUN = analyze_one, future.seed = TRUE)
 summaries <- rbindlist(lapply(results, function(x) if (!is.null(x)) x$summary else NULL), fill = TRUE)
 summaries$network <- sub("^network_", "", tools::file_path_sans_ext(summaries$file))
 fwrite(summaries, file.path(opt$out_dir, "networks_summary.csv"))
-
-#Consolidate degree distributions
-degree_dists <- rbindlist(lapply(results, function(x) if (!is.null(x)) x$degree_dist else NULL), fill = TRUE)
-fwrite(degree_dists, file.path(opt$out_dir, "networks_degree_dist.csv"))
-
 
 #Save metadata about per-node outputs
 node_paths <- rbindlist(lapply(results, function(x) {
@@ -335,7 +312,8 @@ if (opt$make_html) {
     "if (!requireNamespace('pacman', quietly = TRUE)) install.packages('pacman')\n",
     "pacman::p_load(data.table, ggplot2, ggpubr, purrr)\n",
     "summary <- fread('", file.path("networks_summary.csv"), "')\n",
-    "print(summary)\n",
+    "knitr::kable(summary, caption = 'Network summary')\n",
+    #"print(summary)\n",
     "```\n\n",
     file = rmd, sep = "", append = TRUE
   )
@@ -356,59 +334,59 @@ if (opt$make_html) {
     file = rmd, append = TRUE,  sep = ""
   )
   
-  #Degree distribution section
- 
-  #Load degree distributions
-  cat(
-    "```{r, echo=FALSE}\n",
-    "deg_dists <- fread('", file.path("networks_degree_dist.csv"), "')\n",
-    "deg_dists <- merge(deg_dists, summary[, .(file, gamma_exponent)], by.x = 'network', by.y = 'file', all.x = TRUE)\n",
-    "```\n\n",
-    file = rmd, sep = "", append = TRUE
-  )
-  
-  # Degree distribution plot function
-  cat(
-    "```{r, echo=FALSE, fig.width=6, fig.height=5}\n",
-    "plot_degree <- function(df, net_name) {\n",
-    "  gamma_val <- unique(df$gamma_exponent)\n",
-    "  ggplot(df, aes(x = degree, y = Prob)) +\n",
-    "    geom_point(color = 'blue', size = 2, alpha = 0.8) +\n",
-    "    scale_x_log10() + scale_y_log10() +\n",
-    "    labs(x = expression(log(k)), y = expression(log(p(k))),\n",
-    "         subtitle = paste0(net_name, '\\nDegree distribution')) +\n",
-    "    geom_smooth(method = 'lm', se = FALSE, color = 'black', linetype = 'dashed') +\n",
-    "    annotate('text', x = min(df$degree), y = max(df$Prob), hjust = 0, vjust = 1,\n",
-    "             label = paste0('γ = ', round(gamma_val, 2)), size = 4) +\n",
-    "    theme_minimal(base_size = 14)\n",
-    "}\n",
-    "```\n\n",
-    file = rmd, sep = "", append = TRUE
-  )
-  
-  cat(
-    "```{r, echo=FALSE, results='asis'}\n",
-    "nets <- unique(deg_dists$network)\n",
-    "for (net in nets) {\n",
-    "  df <- deg_dists[network == net]\n",
-    "  print(plot_degree(df, net))\n",
-    "}\n",
-    "```\n\n",
-    file = rmd, sep = "", append = TRUE
-  )
-  
-  cat(
-    "```{r, echo=FALSE, fig.width=7, fig.height=6}\n",
-    "ggplot(deg_dists, aes(x = degree, y = Prob, color = network)) +\n",
-    "  geom_point(size = 2, alpha = 0.7) +\n",
-    "  geom_smooth(method = 'lm', se = FALSE, linetype = 'dashed', size = 1) +\n",
-    "  scale_x_log10() + scale_y_log10() +\n",
-    "  labs(x = expression(log(k)), y = expression(log(p(k))),\n",
-    "       title = 'All networks degree distribution') +\n",
-    "  theme_minimal(base_size = 14)\n",
-    "```\n\n",
-    file = rmd, sep = '', append = TRUE
-  )
+  # #Degree distribution section
+  # 
+  # #Load degree distributions
+  # cat(
+  #   "```{r, echo=FALSE}\n",
+  #   "deg_dists <- fread('", file.path("networks_degree_dist.csv"), "')\n",
+  #   "deg_dists <- merge(deg_dists, summary[, .(file, gamma_exponent)], by.x = 'network', by.y = 'file', all.x = TRUE)\n",
+  #   "```\n\n",
+  #   file = rmd, sep = "", append = TRUE
+  # )
+  # 
+  # # Degree distribution plot function
+  # cat(
+  #   "```{r, echo=FALSE, fig.width=6, fig.height=5}\n",
+  #   "plot_degree <- function(df, net_name) {\n",
+  #   "  gamma_val <- unique(df$gamma_exponent)\n",
+  #   "  ggplot(df, aes(x = degree, y = Prob)) +\n",
+  #   "    geom_point(color = 'blue', size = 2, alpha = 0.8) +\n",
+  #   "    scale_x_log10() + scale_y_log10() +\n",
+  #   "    labs(x = expression(log(k)), y = expression(log(p(k))),\n",
+  #   "         subtitle = paste0(net_name, '\\nDegree distribution')) +\n",
+  #   "    geom_smooth(method = 'lm', se = FALSE, color = 'black', linetype = 'dashed') +\n",
+  #   "    annotate('text', x = min(df$degree), y = max(df$Prob), hjust = 0, vjust = 1,\n",
+  #   "             label = paste0('γ = ', round(gamma_val, 2)), size = 4) +\n",
+  #   "    theme_minimal(base_size = 14)\n",
+  #   "}\n",
+  #   "```\n\n",
+  #   file = rmd, sep = "", append = TRUE
+  # )
+  # 
+  # cat(
+  #   "```{r, echo=FALSE, results='asis'}\n",
+  #   "nets <- unique(deg_dists$network)\n",
+  #   "for (net in nets) {\n",
+  #   "  df <- deg_dists[network == net]\n",
+  #   "  print(plot_degree(df, net))\n",
+  #   "}\n",
+  #   "```\n\n",
+  #   file = rmd, sep = "", append = TRUE
+  # )
+  # 
+  # cat(
+  #   "```{r, echo=FALSE, fig.width=7, fig.height=6}\n",
+  #   "ggplot(deg_dists, aes(x = degree, y = Prob, color = network)) +\n",
+  #   "  geom_point(size = 2, alpha = 0.7) +\n",
+  #   "  geom_smooth(method = 'lm', se = FALSE, linetype = 'dashed', size = 1) +\n",
+  #   "  scale_x_log10() + scale_y_log10() +\n",
+  #   "  labs(x = expression(log(k)), y = expression(log(p(k))),\n",
+  #   "       title = 'All networks degree distribution') +\n",
+  #   "  theme_minimal(base_size = 14)\n",
+  #   "```\n\n",
+  #   file = rmd, sep = '', append = TRUE
+  # )
   
     # Define plot specifications
   cat(

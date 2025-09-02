@@ -1,0 +1,11 @@
+network,best_distribution,best_p_value
+network_1.graphml,Gaussian,0.998599694813682
+network_10.graphml,Gaussian,0.99085573569482
+network_2.graphml,Gaussian,0.999311346759039
+network_3.graphml,Gaussian,0.99961171871361
+network_4.graphml,Gaussian,0.804258993409951
+network_5.graphml,Gaussian,0.897373290582348
+network_6.graphml,Gaussian,0.970187601239338
+network_7.graphml,Gaussian,0.998940884547471
+network_8.graphml,Exponential,0.57626070579331
+network_9.graphml,Gaussian,0.900860980989376

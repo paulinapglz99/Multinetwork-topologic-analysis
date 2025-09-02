@@ -1,0 +1,47 @@
+---
+title: "Network Null Distribution Analysis Report"
+output: html_document
+---
+
+```{r, echo=FALSE}
+if (!requireNamespace('pacman', quietly = TRUE)) install.packages('pacman')
+pacman::p_load(data.table, ggplot2, ggpubr, purrr, dplyr, tidyr)
+summary_null <- fread('null_model_report.csv')
+knitr::kable(summary_null, caption = 'Network Null Distribution Analysis Report')
+```
+
+```{r facet_plot, echo=FALSE, fig.height=6, fig.width=10}
+df_long <- summary_null %>%
+  select(network,
+         clustering_obs, clustering_ci_low, clustering_ci_high,
+         assort_obs, assort_ci_low, assort_ci_high,
+         modularity_obs, modularity_ci_low, modularity_ci_high,
+         gamma_obs, gamma_ci_low, gamma_ci_high) %>%
+  pivot_longer(-network,
+               names_to = c('metric', '.value'),
+               names_pattern = '(.*)_(obs|ci_low|ci_high)')
+
+ggplot(df_long, aes(x = network, y = obs)) +
+  geom_point(color = 'red', size = 2) +
+  geom_errorbar(aes(ymin = ci_low, ymax = ci_high), width = 0.2) +
+  coord_flip() +
+  facet_wrap(~metric, scales = 'free_y') +
+  theme_minimal() +
+  labs(y = 'Observed value with null CI',
+       x = 'Network',
+       title = 'Null model analysis across metrics')
+```
+
+```{r heatmap_plot, echo=FALSE, fig.height=5, fig.width=7}
+df_sig <- summary_null %>%
+  select(network, ends_with('outside_CI')) %>%
+  pivot_longer(-network, names_to = 'metric', values_to = 'outside')
+
+ggplot(df_sig, aes(x = metric, y = network, fill = outside)) +
+  geom_tile(color = 'white') +
+  scale_fill_manual(values = c('FALSE' = 'grey80', 'TRUE' = 'red')) +
+  labs(title = 'Metrics outside null CI',
+       x = 'Metric', y = 'Network') +
+  theme_minimal()
+```
+

@@ -1,8 +1,7 @@
 Rscript ~/Multinetwork-topologic-analysis/network_topology.R \
--i ~/Multinetwork-topologic-analysis/test_data/graphmls \
+-i /datos/rosmap/multiregion_networks/all_nets \
 -p ".*\\.graphml$" \
--o ~/Multinetwork-topologic-analysis/results_graphml \
+-o /datos/rosmap/multiregion_networks/all_nets/results_degree \
 -w 2 \
---per_node TRUE \
 --make_html TRUE
 

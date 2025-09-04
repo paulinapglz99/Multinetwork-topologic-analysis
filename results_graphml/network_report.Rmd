@@ -7,7 +7,7 @@ output: html_document
 if (!requireNamespace('pacman', quietly = TRUE)) install.packages('pacman')
 pacman::p_load(data.table, ggplot2, ggpubr, purrr)
 summary <- fread('networks_summary.csv')
-print(summary)
+knitr::kable(summary, caption = 'Network summary')
 ```
 
 ```{r, echo=FALSE}

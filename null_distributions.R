@@ -100,15 +100,6 @@ calculate_metrics <- function(graph) {
   )
 }
 
-#Randomize networks
-randomize_graph <- function(graph, num_randomizations, niter = 1000) {
-  replicate(num_randomizations, rewire(graph, with = keeping_degseq(niter = niter)), simplify = FALSE)
-}
-#For randomizations that need to maintain distribution
-randomize_graph_nodis <- function(graph, num_randomizations, niter = 1000) {
-  replicate(num_randomizations, rewire(graph, with = each_edge(0.8, loops = FALSE, multiple = TRUE)), simplify = FALSE)
-}
-
 #Calculate gamma
 calculate_gamma <- function(graph) {
   degree_distribution <- degree(graph)
@@ -123,21 +114,40 @@ calculate_gamma <- function(graph) {
   -coef(fit)["log_degree"]
 }
 
+# #Randomize networks maintaing distribution
+# randomize_graph <- function(graph, num_randomizations, niter = 1000) {
+#   replicate(num_randomizations, rewire(graph, with = keeping_degseq(niter = niter)), simplify = FALSE)
+# }
+# #For randomizations that need to not to maintain distribution
+# randomize_graph_nodis <- function(graph, num_randomizations, niter = 1000) {
+#   replicate(num_randomizations, rewire(graph, with = each_edge(0.8, loops = FALSE, multiple = TRUE)), simplify = FALSE)
+# }
+
 #Function to analyze one network
-null_dist_net <- function(path, num_randomizations = 500) {
+#Randomize networks maintaing distribution for  clustering, assort, modularity
+
+null_dist_net <- function(path, num_randomizations = 700) {
   g <- read_network(path)
   metrics_obs <- calculate_metrics(g)
   gamma_obs <- calculate_gamma(g)
   
-  random_graphs <- randomize_graph(g, num_randomizations)
-  metrics_random <- lapply(random_graphs, calculate_metrics)
+  clustering_random <- numeric(num_randomizations)
+  assort_random <- numeric(num_randomizations)
+  modu_random <- numeric(num_randomizations)
   
-  clustering_random <- sapply(metrics_random, function(x) x$clustering)
-  assort_random    <- sapply(metrics_random, function(x) x$assortativity)
-  modu_random      <- sapply(metrics_random, function(x) x$modularity)
+  for (i in seq_len(num_randomizations)) {
+    g_rand <- sample_degseq(degree(g), method = "configuration")
+    m <- calculate_metrics(g_rand)
+    clustering_random[i] <- m$clustering
+    assort_random[i] <- m$assortativity
+    modu_random[i] <- m$modularity
+  }
   
-  random_graphs_nodis <- randomize_graph_nodis(g, num_randomizations)
-  gamma_random <- sapply(random_graphs_nodis, calculate_gamma)
+  gamma_random <- numeric(num_randomizations)
+  for (i in seq_len(num_randomizations)) {
+    g_rand <- sample_gnm(vcount(g), ecount(g), loops = FALSE)
+    gamma_random[i] <- calculate_gamma(g_rand)
+  }
   
   results <- tibble::tibble(
     network = basename(path),
@@ -167,12 +177,14 @@ null_dist_net <- function(path, num_randomizations = 500) {
 #Execute
 
 plan(multisession, workers = opt$workers)
+message("Calculating random networks and evaluating null models \n")
 summaries <- future_lapply(files, null_dist_net, future.seed = opt$seed)
 
 #One tibble
+message("Binding summaries \n")
 summaries <- dplyr::bind_rows(summaries)
 
-message("#Saving table")
+message("#Saving table \n")
 output <- file.path(opt$out_dir, "null_model_report.csv")
 summaries$network <- tools::file_path_sans_ext(summaries$network)
 readr::write_csv(summaries, output)

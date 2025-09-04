@@ -11,7 +11,7 @@ knitr::kable(summary_null, caption = 'Network Null Distribution Analysis Report'
 ```
 
 ```{r facet_plot, echo=FALSE, fig.height=6, fig.width=10}
-df_long <- summary_null %>%
+summary_null.l <- summary_null %>%
   select(network,
          clustering_obs, clustering_ci_low, clustering_ci_high,
          assort_obs, assort_ci_low, assort_ci_high,
@@ -21,7 +21,7 @@ df_long <- summary_null %>%
                names_to = c('metric', '.value'),
                names_pattern = '(.*)_(obs|ci_low|ci_high)')
 
-ggplot(df_long, aes(x = network, y = obs)) +
+ggplot(summary_null.l, aes(x = network, y = obs)) +
   geom_point(color = 'red', size = 2) +
   geom_errorbar(aes(ymin = ci_low, ymax = ci_high), width = 0.2) +
   coord_flip() +
@@ -33,14 +33,14 @@ ggplot(df_long, aes(x = network, y = obs)) +
 ```
 
 ```{r heatmap_plot, echo=FALSE, fig.height=5, fig.width=7}
-df_sig <- summary_null %>%
+summary_sig <- summary_null %>%
   select(network, ends_with('outside_CI')) %>%
   pivot_longer(-network, names_to = 'metric', values_to = 'outside')
 
-ggplot(df_sig, aes(x = metric, y = network, fill = outside)) +
+ggplot(summary_sig, aes(x = metric, y = network, fill = outside)) +
   geom_tile(color = 'white') +
   scale_fill_manual(values = c('FALSE' = 'grey80', 'TRUE' = 'red')) +
-  labs(title = 'Metrics outside null CI',
+  labs(title = 'Metrics outside null CI', subtitle = 'Tiles in red show metrics outside the random distribution',
        x = 'Metric', y = 'Network') +
   theme_minimal()
 ```

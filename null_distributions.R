@@ -2,7 +2,7 @@
 
 #null_distributions.R
 #Usage: https://github.com/paulinapglz99/Multinetwork-topologic-analysis
-
+time<- Sys.time()
 if (!requireNamespace("pacman", quietly = FALSE)) install.packages("pacman", repos = "https://cloud.r-project.org")
 if (!requireNamespace("optparse", quietly = FALSE)) install.packages("optparse", repos = "https://cloud.r-project.org")
 
@@ -174,7 +174,7 @@ summaries <- dplyr::bind_rows(summaries)
 
 message("#Saving table")
 output <- file.path(opt$out_dir, "null_model_report.csv")
-summaries$network <- sub("^network_", "", tools::file_path_sans_ext(summaries$file))
+summaries$network <- tools::file_path_sans_ext(summaries$network)
 readr::write_csv(summaries, output)
 message("Report is in: ", output)
 
@@ -243,7 +243,7 @@ if (opt$make_html) {
     "ggplot(summary_sig, aes(x = metric, y = network, fill = outside)) +\n",
     "  geom_tile(color = 'white') +\n",
     "  scale_fill_manual(values = c('FALSE' = 'grey80', 'TRUE' = 'red')) +\n",
-    "  labs(title = 'Metrics outside null CI', subtitle = 'Tiles in red show metrics outside the random distribution'\n",
+    "  labs(title = 'Metrics outside null CI', subtitle = 'Tiles in red show metrics outside the random distribution',\n",
     "       x = 'Metric', y = 'Network') +\n",
     "  theme_minimal()\n",
     "```\n\n",
@@ -256,4 +256,5 @@ if (opt$make_html) {
   cat("HTML report saved in:", file.path(opt$out_dir, "null_dis_network_report.html"), "\n")
 }
 
+difftime(Sys.time(), time, units = "mins")
 #END

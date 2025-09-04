@@ -96,7 +96,24 @@ files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)
 if (length(files) < 2) stop("Se necesitan al menos 2 archivos para comparar.")
 net_names <- basename(files)
 
+#Compare modularity between graphs --- ---
+#, applying 
+#variation of information "vi"
+#normalized mutual information "nmi"
+#split-join distance "split-join distance"
+#Rand index "Rand index"
+#adjusted Rand index "adjusted Rand index"
 
+possible_algos <- c("vi", "nmi", "split.join", "rand", "adjusted.rand")
+
+comparison_methods <- sapply(X = possible_algos, FUN = function(i){
+  igraph::compare(comm1 = graphAD_plus_modules,
+                  comm2 = graphnoAD_plus_modules,
+                  method = i
+  )
+})
+
+comparison_methods
 
 
 

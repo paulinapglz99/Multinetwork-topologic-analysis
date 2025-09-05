@@ -69,20 +69,20 @@ process_network <- function(row) {
   
   message("Processing: ", fname)
   
-  # Definir la ruta de salida ANTES de usarla
+  #Define output path
   out_file <- file.path(opt$out_dir, paste0(tools::file_path_sans_ext(fname), "_enrichment.csv"))
   
-  # Leer el resumen de nodos
+  #Read the path summary
   summary_df <- fread(summary_path)
   
-  # FIX: Añadir una verificación para asegurar que el archivo no está vacío
+  #Add a check to ensure that the file is not empty.
   if (nrow(summary_df) == 0) {
     message("Warning: Skipping ", fname, " because its node table is empty.")
     return(paste0(out_file, " (skipped, empty input)"))
   }
   
   if (!"membership_infomap" %in% colnames(summary_df)) {
-    stop('"node_table" no tiene la columna membership_infomap"')
+    stop('"node_table" does not have the membership_infomap column"')
   }
   
   #Split the nodes per community to enrich
@@ -94,7 +94,7 @@ process_network <- function(row) {
     res <- tryCatch(enricher_fun(nodes), error = function(e) NULL)
     res <- replace_null(res)
     
-    #Convert to dataframes
+#Convert to dataframes
     if (nrow(as.data.frame(res)) > 0) {
       df <- as.data.frame(res)
       df$CommunityID <- community_id

@@ -171,7 +171,7 @@ percolation_threshold <- function(g, mode = c("random","targeted"), steps = 51, 
 }
 
 #Function to analyze one file -> list with summary and optional node table path
-analyze_one <- function(path) {
+analyze_one <- function(path, percol_steps, per_node, out_dir, type = "auto") {
   nm <- basename(path)
   cat("Processing:", nm, "\n")
   g <- tryCatch(read_network(path), error = function(e) { message(e); return(NULL) })
@@ -267,7 +267,6 @@ analyze_one <- function(path) {
               ))
 }
 
-
 #Parallelize over files
 plan(multisession, workers = opt$workers)
 results <- future_lapply(files, FUN = analyze_one, future.seed = TRUE)
@@ -333,60 +332,6 @@ if (opt$make_html) {
     "```\n\n",
     file = rmd, append = TRUE,  sep = ""
   )
-  
-  # #Degree distribution section
-  # 
-  # #Load degree distributions
-  # cat(
-  #   "```{r, echo=FALSE}\n",
-  #   "deg_dists <- fread('", file.path("networks_degree_dist.csv"), "')\n",
-  #   "deg_dists <- merge(deg_dists, summary[, .(file, gamma_exponent)], by.x = 'network', by.y = 'file', all.x = TRUE)\n",
-  #   "```\n\n",
-  #   file = rmd, sep = "", append = TRUE
-  # )
-  # 
-  # # Degree distribution plot function
-  # cat(
-  #   "```{r, echo=FALSE, fig.width=6, fig.height=5}\n",
-  #   "plot_degree <- function(df, net_name) {\n",
-  #   "  gamma_val <- unique(df$gamma_exponent)\n",
-  #   "  ggplot(df, aes(x = degree, y = Prob)) +\n",
-  #   "    geom_point(color = 'blue', size = 2, alpha = 0.8) +\n",
-  #   "    scale_x_log10() + scale_y_log10() +\n",
-  #   "    labs(x = expression(log(k)), y = expression(log(p(k))),\n",
-  #   "         subtitle = paste0(net_name, '\\nDegree distribution')) +\n",
-  #   "    geom_smooth(method = 'lm', se = FALSE, color = 'black', linetype = 'dashed') +\n",
-  #   "    annotate('text', x = min(df$degree), y = max(df$Prob), hjust = 0, vjust = 1,\n",
-  #   "             label = paste0('γ = ', round(gamma_val, 2)), size = 4) +\n",
-  #   "    theme_minimal(base_size = 14)\n",
-  #   "}\n",
-  #   "```\n\n",
-  #   file = rmd, sep = "", append = TRUE
-  # )
-  # 
-  # cat(
-  #   "```{r, echo=FALSE, results='asis'}\n",
-  #   "nets <- unique(deg_dists$network)\n",
-  #   "for (net in nets) {\n",
-  #   "  df <- deg_dists[network == net]\n",
-  #   "  print(plot_degree(df, net))\n",
-  #   "}\n",
-  #   "```\n\n",
-  #   file = rmd, sep = "", append = TRUE
-  # )
-  # 
-  # cat(
-  #   "```{r, echo=FALSE, fig.width=7, fig.height=6}\n",
-  #   "ggplot(deg_dists, aes(x = degree, y = Prob, color = network)) +\n",
-  #   "  geom_point(size = 2, alpha = 0.7) +\n",
-  #   "  geom_smooth(method = 'lm', se = FALSE, linetype = 'dashed', size = 1) +\n",
-  #   "  scale_x_log10() + scale_y_log10() +\n",
-  #   "  labs(x = expression(log(k)), y = expression(log(p(k))),\n",
-  #   "       title = 'All networks degree distribution') +\n",
-  #   "  theme_minimal(base_size = 14)\n",
-  #   "```\n\n",
-  #   file = rmd, sep = '', append = TRUE
-  # )
   
     # Define plot specifications
   cat(

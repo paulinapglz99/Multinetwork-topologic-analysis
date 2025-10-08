@@ -33,24 +33,24 @@ if (all(ok)) {
 
 option_list <- list(
   optparse::make_option(c("-i","--index_file"), type="character", help="Index file (csv/tsv with file,node_table, output of network_topology.R)"),
-  optparse::make_option(c("-u","--universe"), type="character", help="File containing gene universe (txt)"),
+  #optparse::make_option(c("-u","--universe"), type="character", help="File containing gene universe (txt)"),
   optparse::make_option(c("-o","--out_dir"), type="character", default="results_enrichment", help="Output directory"),
   optparse::make_option(c("-w","--workers"), type="integer", default=4, help="Number of parallel workers"),
   optparse::make_option(c("--seed"), type="integer", default=42, help="Seed")
 )
 
 opt <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
-if (is.null(opt$index_file) || is.null(opt$universe)) stop("--index_file and/or --universe missing")
+if (is.null(opt$index_file)) stop("--index_file missing")
 
 dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
-universe <- scan(opt$universe, what = character())
+#universe <- scan(opt$universe, what = character())
 
 #Function to read graphs
 
-enricher_fun <- function(nodes) {
+enricher_fun <- function(nodes, network_universe) {
   enrichGO(gene = nodes,
            OrgDb = org.Hs.eg.db,
-           universe = universe,
+           universe = network_universe,
            keyType = 'ENSEMBL',
            readable = TRUE,
            ont = "BP",
@@ -85,13 +85,16 @@ process_network <- function(row) {
     stop('"node_table" does not have the membership_infomap column"')
   }
   
+  #Read network universe
+  network_universe <- unique(summary_df$node)
+  
   #Split the nodes per community to enrich
   nodes_by_comm <- split(summary_df$node, summary_df$membership_infomap)
   
   #Enrich each comm
   enriched_list <- lapply(names(nodes_by_comm), function(community_id) {
     nodes <- nodes_by_comm[[community_id]]
-    res <- tryCatch(enricher_fun(nodes), error = function(e) NULL)
+    res <- tryCatch(enricher_fun(nodes, network_universe), error = function(e) NULL)
     res <- replace_null(res)
     
 #Convert to dataframes
@@ -104,10 +107,10 @@ process_network <- function(row) {
     }
   })
   
-  #Combine dataframes:)
-  final_summary <- data.table::rbindlist(enriched_list)
+#Combine dataframes:)
+final_summary <- data.table::rbindlist(enriched_list)
   
-  #Save combined result (if not empty)
+#Save combined result (if not empty)
   if (nrow(final_summary) > 0) {
     fwrite(final_summary, file = out_file)
   } else {

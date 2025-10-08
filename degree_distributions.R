@@ -128,20 +128,20 @@ fit_distributions <- function(degree_freq) {
   
   results$PowerLaw <- list(p_value = p_value_powl$p)
   
-  # Poisson
+  #Poisson
   poisson_fit <- fitdist(degree_freq$degree, "pois")
   lambda <- poisson_fit$estimate
   ks_test_pois <- ks.test(degree_freq$degree, "ppois", lambda)
   results$Poisson <- list(p_value = ks_test_pois$p.value)
   
-  # Normal
+  #Normal
   gaussian_fit <- fitdist(degree_freq$degree, "norm")
   mean_est <- gaussian_fit$estimate["mean"]
   sd_est <- gaussian_fit$estimate["sd"]
   ks_test_norm <- ks.test(degree_freq$degree, "pnorm", mean_est, sd_est)
   results$Gaussian <- list(p_value = ks_test_norm$p.value)
   
-  # Pareto
+  #Pareto
   pareto_fit <- vglm(degree_freq$degree ~ 1, paretoff, trace = FALSE)
   shape <- Coef(pareto_fit)["shape"]
   scale <- Coef(pareto_fit)["scale"]
@@ -151,8 +151,8 @@ fit_distributions <- function(degree_freq) {
   )
   results$Pareto <- list(p_value = ks_test_pareto$p.value)
   
-  # Exponential
-  exp_fit <- fitdist(degree_freq$degree, "exp")
+  #Exponential
+  exp_fit <- fitdist(degree_freq$degree, "exp", method="mme")
   rate_exp <- exp_fit$estimate["rate"]
   ks_test_exp <- ks.test(degree_freq$degree, "pexp", rate = rate_exp)
   results$Exponential <- list(p_value = ks_test_exp$p.value)

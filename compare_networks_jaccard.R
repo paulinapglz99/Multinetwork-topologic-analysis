@@ -109,7 +109,7 @@ for (f in files) {
   net_name <- tools::file_path_sans_ext(basename(f))
   df <- data.table::fread(f)
   if (!all(c("node", "membership_infomap") %in% colnames(df))) {
-    stop("❌ File ", f, " must contain columns 'node' and 'membership_infomap'")
+    stop("File ", f, " must contain columns 'node' and 'membership_infomap'")
   }
   modules_nets[[net_name]] <- split(df$node, df$membership_infomap)
 }
@@ -138,8 +138,7 @@ pairs_auto <- names_df %>%
   mutate(pair = map2(ad, ctrl, ~c(.x, .y))) %>%
   pull(pair)
 
-if (length(pairs_auto) == 0)
-  stop("No pairs detected automatically")
+if (length(pairs_auto) == 0)  stop("No pairs detected automatically")
 
 print(pairs_auto)
 

@@ -24,10 +24,12 @@ if (all(ok)) {
        paste(names(ok)[!ok], collapse = ", "))
 }
 
+path <- "~/Multinetwork-topologic-analysis/test_data/graphmls/"
+
 #Define option list for inputs
 
 option_list <- list(
-  optparse::make_option(c("-i","--input_dir"), type="character", help="Carpeta con redes"),
+  optparse::make_option(c("-i","--input_dir"), type="character", help="Directory with networks"),
   optparse::make_option(c("-p","--pattern"), type="character", default=".*\\.(csv|tsv|txt|graphml)$", help="File regex (default: .*\\.(csv|tsv|txt|graphml)$)"),
   optparse::make_option(c("-o","--out_dir"), type="character", default="results_jaccard", help="Output directory"),
   optparse::make_option(c("-w","--workers"), type="integer", default=4, help="Number of parallel workers"),
@@ -91,10 +93,28 @@ jaccard_simplex <- function(a, b) {
   length(intersect(a, b)) / length(union(a, b))
 }
 
+#Calcular matriz Jaccard entre dos redes
+
+jaccard_matrix <- function(redA, redB) {
+  mat <- matrix(0, nrow = length(redA), ncol = length(redB),
+                dimnames = list(names(redA), names(redB)))
+  
+  for (i in seq_along(redA)) {
+    for (j in seq_along(redB)) {
+      mat[i, j] <- jaccard_index(redA[[i]], redB[[j]])
+    }
+  }
+  
+  return(mat)
+}
+
 #Build sets
 files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)
+files <- list.files("~/Multinetwork-topologic-analysis/test_data/graphmls/", full.names = TRUE)
+
 if (length(files) < 2) stop("Se necesitan al menos 2 archivos para comparar.")
 net_names <- basename(files)
+
 
 #Compare modularity between graphs --- ---
 #Applying 

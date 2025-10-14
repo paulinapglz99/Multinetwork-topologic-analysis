@@ -115,6 +115,34 @@ files <- list.files("~/Multinetwork-topologic-analysis/test_data/graphmls/", ful
 if (length(files) < 2) stop("Se necesitan al menos 2 archivos para comparar.")
 net_names <- basename(files)
 
+# Leer todas las redes
+redes <- lapply(files, read_network)
+names(redes) <- tools::file_path_sans_ext(basename(files))
+
+# Obtener módulos (clusters de comunidad)
+# (ajusta el método si ya tienes módulos predefinidos)
+redes_modulos <- lapply(redes, function(g) {
+  cl <- igraph::cluster_louvain(g)
+  split(names(membership(cl)), membership(cl))
+})
+
+# ------------------------------
+# Aplicar a varios pares de redes
+# ------------------------------
+comparar_redes <- function(lista_redes, pares) {
+  resultados <- list()
+  
+  for (p in pares) {
+    redA <- lista_redes[[p[1]]]
+    redB <- lista_redes[[p[2]]]
+    nombre <- paste(p[1], p[2], sep = "_vs_")
+    
+    resultados[[nombre]] <- jaccard_matrix(redA, redB)
+  }
+  
+  return(resultados)
+}
+
 
 #Compare modularity between graphs --- ---
 #Applying 

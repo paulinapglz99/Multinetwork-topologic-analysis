@@ -1,9 +1,7 @@
 #!/usr/bin/env Rscript
 
-# compare_networks_jaccard.R
-# Calcula matrices de similitud de Jaccard entre módulos
-# Empareja automáticamente AD vs Control y genera heatmaps
-
+#compare_networks_jaccard.R
+#Calculate Jaccard similarity matrices between modules
 # Usage:
 # Rscript compare_networks_jaccard.R \
 #    --input_dir /ruta/a/archivos \
@@ -23,7 +21,7 @@ if (all(ok)) {
        paste(names(ok)[!ok], collapse = ", "))
 }
 
-# Parser
+#Parser
 option_list <- list(make_option(c("-i", "--input_dir"), type = "character", default = getwd(), help = "Directory where the *_nodes_summary.csv are", metavar = "character"),
                     make_option(c("-o", "--output_dir"), type = "character", default = "./results_jaccard", help = "Output directory [default: %default]", metavar = "character"),
                     make_option(c("-p", "--pattern"), type = "character", default = "_nodes_summary\\.csv$", help = "Regex to select files [default: %default]", metavar = "character")
@@ -43,7 +41,7 @@ message("Pattern: ", pattern)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 set.seed(42)
 
-# --- FUNCTIONS --------------------------------------------------------------
+#Functions --- ---
 
 # Jaccard index
 jaccard_index <- function(a, b) {
@@ -224,5 +222,77 @@ for (i in seq_along(results)) {
   message("Saved plot: ", out_png)
 }
 
-message("Done.")
-# END
+# --- HEATMAP COMBINADO POR REGIÓN ------------------------------------------
+
+message("Building combined block heatmap...")
+
+# Necesitamos unificar todas las matrices Jaccard (una por región)
+# y construir un gran bloque (AD vs Control) concatenado por región.
+
+# Convertir cada matriz en un data.frame con columnas de región, AD y Control
+all_blocks <- list()
+
+for (n in names(results)) {
+  region <- make_pretty_name(n) %>% str_replace(" vs .*", "") # por ejemplo "DLPFC"
+  mat <- results[[n]]
+  if (is.null(dim(mat)) || nrow(mat) == 0 || ncol(mat) == 0) next
+  
+  df <- as.data.frame(as.table(mat))
+  colnames(df) <- c("Community_Control", "Community_AD", "Jaccard")
+  
+  df <- df %>%
+    mutate(
+      Region = region,
+      Community_Control_full = paste0(region, "_", Community_Control),
+      Community_AD_full = paste0(region, "_", Community_AD)
+    )
+  
+  all_blocks[[region]] <- df
+}
+
+# Unir todos los data.frames
+combined_df <- bind_rows(all_blocks)
+
+if (nrow(combined_df) == 0) {
+  warning("Combined heatmap: no data to plot.")
+} else {
+  # Para graficar un solo gran heatmap bloqueado
+  combined_df$Community_Control_full <- factor(combined_df$Community_Control_full,
+                                               levels = unique(combined_df$Community_Control_full))
+  combined_df$Community_AD_full <- factor(combined_df$Community_AD_full,
+                                          levels = unique(combined_df$Community_AD_full))
+  
+  p_combined <- ggplot(combined_df, aes(x = Community_AD_full, y = Community_Control_full, fill = Jaccard)) +
+    geom_tile(color = "gray90", size = 0.1) +
+    scale_fill_gradient(low = "white", high = "navyblue", na.value = "gray90") +
+    geom_vline(
+      data = combined_df %>% group_by(Region) %>% summarise(x_pos = max(as.numeric(Community_AD_full))),
+      aes(xintercept = x_pos + 0.5), color = "black", linewidth = 0.7
+    ) +
+    geom_hline(
+      data = combined_df %>% group_by(Region) %>% summarise(y_pos = max(as.numeric(Community_Control_full))),
+      aes(yintercept = y_pos + 0.5), color = "black", linewidth = 0.7
+    ) +
+    labs(
+      title = "Combined Jaccard Heatmap (AD vs Control)",
+      subtitle = "Blocks represent each region",
+      fill = "Jaccard Index",
+      x = "Communities (AD)",
+      y = "Communities (Control)"
+    ) +
+    theme_classic(base_size = 12) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, color = "black", size = 8),
+      axis.text.y = element_text(color = "black", size = 8),
+      plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+      plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray30"),
+      legend.position = "right"
+    )
+  
+  out_combined <- file.path(plot_dir, "Heatmap_combined_blocks.png")
+  ggsave(out_combined, plot = p_combined, width = 18, height = 14, dpi = 300)
+  message("Saved combined heatmap: ", out_combined)
+}
+
+# --- NETWORK META-GRAPH (BIPARTITO AD vs CONTROL POR REGIÓN) -----------------
+

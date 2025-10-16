@@ -31,8 +31,11 @@ opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
 input_dir <- opt$input_dir
+#input_dir <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_topos/"
 out_dir   <- opt$output_dir
+#out_dir   <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_jaccard_1"
 pattern   <- opt$pattern
+#pattern   <-  "_nodes_summary\\.csv$"
 
 message("Input dir: ", input_dir)
 message("Output dir: ", out_dir)
@@ -43,14 +46,14 @@ set.seed(42)
 
 #Functions --- ---
 
-# Jaccard index
+#Jaccard index
 jaccard_index <- function(a, b) {
   if (length(a) == 0 && length(b) == 0) return(1)
   if (length(a) == 0 || length(b) == 0) return(0)
   length(intersect(a, b)) / length(union(a, b))
 }
 
-# Jaccard matrix between two lists of modules
+#Jaccard matrix between two lists of modules
 jaccard_matrix <- function(redA, redB) {
   mat <- matrix(0, nrow = length(redA), ncol = length(redB),
                 dimnames = list(names(redA), names(redB)))
@@ -62,7 +65,7 @@ jaccard_matrix <- function(redA, redB) {
   return(mat)
 }
 
-# Make readable names for comparisons (robusto: varios sufijos/variantes)
+#Make readable names for comparisons
 make_pretty_name <- function(x) {
   x %>%
     str_replace_all("(?i)_top10pct_nodes_summary", "") %>%
@@ -75,7 +78,7 @@ make_pretty_name <- function(x) {
     str_trim()
 }
 
-# Compare networks given a named list and list of pairs (each pair is c("A","B"))
+#Compare networks given a named list and list of pairs (each pair is c("A","B"))
 compare_networks <- function(list_nets, pairs) {
   results <- list()
   for (p in pairs) {
@@ -83,16 +86,27 @@ compare_networks <- function(list_nets, pairs) {
     netB_name <- p[2]
     if (!(netA_name %in% names(list_nets))) stop("Missing network: ", netA_name)
     if (!(netB_name %in% names(list_nets))) stop("Missing network: ", netB_name)
+    
     netA <- list_nets[[netA_name]]
     netB <- list_nets[[netB_name]]
     name <- paste(netA_name, netB_name, sep = "_vs_")
     message("Comparing ", name)
-    results[[name]] <- jaccard_matrix(netA, netB)
+    
+    mat <- jaccard_matrix(netA, netB)
+    
+    # Etiquetar filas y columnas con el nombre de la red
+    condA <- ifelse(grepl("AD", netA_name, ignore.case = TRUE), "AD", "ctrl")
+    condB <- ifelse(grepl("AD", netB_name, ignore.case = TRUE), "AD", "ctrl")
+    
+    rownames(mat) <- paste0(condA, "_", seq_len(nrow(mat)))
+    colnames(mat) <- paste0(condB, "_", seq_len(ncol(mat)))
+    
+    results[[name]] <- mat
   }
   return(results)
 }
 
-# --- READ FILES / BUILD MODULE LISTS ----------------------------------------
+#Read files and build module lists
 
 files <- list.files(input_dir, pattern = pattern, full.names = TRUE)
 if (length(files) < 2) stop("You need at least 2 files *_nodes_summary.csv to compare.")
@@ -108,11 +122,13 @@ for (f in files) {
   modules_nets[[net_name]] <- split(df$node, df$membership_infomap)
 }
 
-# --- AUTO-DETECT PAIRS (AD vs CONTROL) -------------------------------------
+#This is tricky, autodetect pairs of networks, little hardcored
 
 names_df <- tibble(name = names(modules_nets)) %>%
   mutate(
-    # prefix: everything up to "_counts" (lazy). If no "_counts", take part before _AD_/_control_ as fallback
+    #prefix: everything up to "_counts" (lazy).
+    #If no "_counts", take part before _AD_/_control_ as fallback
+    
     prefix = coalesce(
       str_extract(name, "^.*?_counts"),
       str_remove(name, "(?i)(_AD_|_ALZ|_ALZHEIMER|_CONTROL_|_CTRL_).*")
@@ -138,21 +154,21 @@ pairs_auto <- names_df %>%
 
 if (length(pairs_auto) == 0) stop("No pairs detected automatically. Revisa los nombres de archivos y patrones AD/control.")
 
-message("Pairs detected (AD vs control):")
+message("Pairs detected:")
 print(pairs_auto)
 
-# --- RUN COMPARISONS --------------------------------------------------------
+#Run Jaccard comparisons
 
 results <- compare_networks(modules_nets, pairs_auto)
 
-# Save jaccard matrix results
+#Save jaccard matrix results
 for (n in names(results)) {
   out_file <- file.path(out_dir, paste0("Jaccard_", n, ".csv"))
   write.csv(results[[n]], out_file, row.names = TRUE)
   message("Saved: ", out_file)
 }
 
-# --- SUMMARY DE PERFECT MATCHES (Jaccard == 1) -------------------------------
+#Get the summary of perfect matches --- ---
 
 perfect_summary <- tibble()
 
@@ -178,17 +194,17 @@ write.csv(perfect_summary, out_csv, row.names = FALSE)
 message("Saved summary: ", out_csv)
 print(perfect_summary)
 
-# --- PLOTS (HEATMAPS) ------------------------------------------------------
+#Plot heatmaps --- ---
 
 message("Plotting heatmaps")
 
 plot_dir <- file.path(out_dir, "plots")
 dir.create(plot_dir, showWarnings = FALSE, recursive = TRUE)
 
-# Create pretty names vector aligned with names(results)
+#Create pretty names vector aligned with names(results)
 pretty_names <- sapply(names(results), make_pretty_name, USE.NAMES = FALSE)
 
-# Loop to plot heatmaps
+#Loop to plot heatmaps
 for (i in seq_along(results)) {
   n <- names(results)[i]
   title_txt <- pretty_names[i]
@@ -222,77 +238,4 @@ for (i in seq_along(results)) {
   message("Saved plot: ", out_png)
 }
 
-# --- HEATMAP COMBINADO POR REGIÓN ------------------------------------------
-
-message("Building combined block heatmap...")
-
-# Necesitamos unificar todas las matrices Jaccard (una por región)
-# y construir un gran bloque (AD vs Control) concatenado por región.
-
-# Convertir cada matriz en un data.frame con columnas de región, AD y Control
-all_blocks <- list()
-
-for (n in names(results)) {
-  region <- make_pretty_name(n) %>% str_replace(" vs .*", "") # por ejemplo "DLPFC"
-  mat <- results[[n]]
-  if (is.null(dim(mat)) || nrow(mat) == 0 || ncol(mat) == 0) next
-  
-  df <- as.data.frame(as.table(mat))
-  colnames(df) <- c("Community_Control", "Community_AD", "Jaccard")
-  
-  df <- df %>%
-    mutate(
-      Region = region,
-      Community_Control_full = paste0(region, "_", Community_Control),
-      Community_AD_full = paste0(region, "_", Community_AD)
-    )
-  
-  all_blocks[[region]] <- df
-}
-
-# Unir todos los data.frames
-combined_df <- bind_rows(all_blocks)
-
-if (nrow(combined_df) == 0) {
-  warning("Combined heatmap: no data to plot.")
-} else {
-  # Para graficar un solo gran heatmap bloqueado
-  combined_df$Community_Control_full <- factor(combined_df$Community_Control_full,
-                                               levels = unique(combined_df$Community_Control_full))
-  combined_df$Community_AD_full <- factor(combined_df$Community_AD_full,
-                                          levels = unique(combined_df$Community_AD_full))
-  
-  p_combined <- ggplot(combined_df, aes(x = Community_AD_full, y = Community_Control_full, fill = Jaccard)) +
-    geom_tile(color = "gray90", size = 0.1) +
-    scale_fill_gradient(low = "white", high = "navyblue", na.value = "gray90") +
-    geom_vline(
-      data = combined_df %>% group_by(Region) %>% summarise(x_pos = max(as.numeric(Community_AD_full))),
-      aes(xintercept = x_pos + 0.5), color = "black", linewidth = 0.7
-    ) +
-    geom_hline(
-      data = combined_df %>% group_by(Region) %>% summarise(y_pos = max(as.numeric(Community_Control_full))),
-      aes(yintercept = y_pos + 0.5), color = "black", linewidth = 0.7
-    ) +
-    labs(
-      title = "Combined Jaccard Heatmap (AD vs Control)",
-      subtitle = "Blocks represent each region",
-      fill = "Jaccard Index",
-      x = "Communities (AD)",
-      y = "Communities (Control)"
-    ) +
-    theme_classic(base_size = 12) +
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, color = "black", size = 8),
-      axis.text.y = element_text(color = "black", size = 8),
-      plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-      plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray30"),
-      legend.position = "right"
-    )
-  
-  out_combined <- file.path(plot_dir, "Heatmap_combined_blocks.png")
-  ggsave(out_combined, plot = p_combined, width = 18, height = 14, dpi = 300)
-  message("Saved combined heatmap: ", out_combined)
-}
-
-# --- NETWORK META-GRAPH (BIPARTITO AD vs CONTROL POR REGIÓN) -----------------
-
+#END

@@ -23,7 +23,7 @@ if (all(ok)) {
   stop("Some packages did not load correctly.")
 }
 
-#Parser ---
+#Parser
 
 option_list <- list(
   make_option(c("-i", "--input_dir"), type = "character", default = getwd(),
@@ -64,34 +64,36 @@ process_jaccard_file <- function(file_path) {
   #Read jaccard matrix Leer matriz Jaccard
   jaccard_mat <- vroom(file_path)
   
-  # Extraer nombres
+  #Get names
   ad_nodes <- jaccard_mat[[1]]
   ctrl_nodes <- colnames(jaccard_mat)[-1]
   
-  # Umbral
-  threshold <- 0.25
+  #threshold
+  threshold <- opt$threshold
   
-  # Formato largo con umbral
+  #Long format to set threshold
   edges_df <- jaccard_mat %>%
     pivot_longer(-1, names_to = "ctrl", values_to = "weight") %>%
     rename(ad = 1) %>%
     filter(weight >= threshold)
   
-  # Crear grafo
+  #build graph from data frame
   g <- graph_from_data_frame(edges_df, directed = FALSE)
   
-  # Atributo bipartito
+  #Set attribute (bipartite)
   V(g)$type <- str_detect(V(g)$name, "^ctrl")
   
-  # Atributo de fenotipo
-  V(g)$fenotipo <- ifelse(str_detect(V(g)$name, "^ctrl"), "control", "AD")
+  #Atributo de fenotipo
+  V(g)$phenotype <- ifelse(str_detect(V(g)$name, "^ctrl"), "control", "AD")
   
-  # Exportar como graphml
+  #Export as graphml
   output_file <- file.path(output_dir, paste0(region, "_bipartite.graphml"))
   write_graph(g, output_file, format = "graphml")
   
   cat("Network", output_file, "\n")
 }
 
-# Procesar todos los archivos
+#Process all files
 walk(files, process_jaccard_file)
+
+#END

@@ -31,11 +31,11 @@ opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
 input_dir <- opt$input_dir
-#input_dir <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_topos/"
+input_dir <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_topos/"
 out_dir   <- opt$output_dir
-#out_dir   <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_jaccard_1"
+out_dir   <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_jaccard_1"
 pattern   <- opt$pattern
-#pattern   <-  "_nodes_summary\\.csv$"
+pattern   <-  "_nodes_summary\\.csv$"
 
 message("Input dir: ", input_dir)
 message("Output dir: ", out_dir)
@@ -236,6 +236,79 @@ for (i in seq_along(results)) {
   out_png <- file.path(plot_dir, paste0("Heatmap_", n, ".png"))
   ggsave(out_png, plot = p, width = 15, height = 10, dpi = 300)
   message("Saved plot: ", out_png)
+}
+
+#Summary of average similarity
+
+message("Building summary map of average similarity...")
+
+summary_stats <- tibble()
+
+for (n in names(results)) {
+  mat <- results[[n]]
+  region <- make_pretty_name(n) %>% str_replace(" vs .*", "")
+  
+  # Para cada comunidad AD (fila): tomar su máximo Jaccard con cualquier control
+  max_jaccard_per_module <- apply(mat, 1, max, na.rm = TRUE)
+  
+  summary_stats <- bind_rows(
+    summary_stats,
+    tibble(
+      region = region,
+      max_jaccard = max_jaccard_per_module
+    )
+  )
+}
+
+if (nrow(summary_stats) == 0) {
+  warning("No summary data to plot.")
+} else {
+  #Save summary table
+  out_sum <- file.path(out_dir, "summary_jaccard_per_region.csv")
+  write.csv(summary_stats, out_sum, row.names = FALSE)
+  message("Saved summary file: ", out_sum)
+  
+  #Get mean and median
+  region_stats <- summary_stats %>%
+    group_by(region) %>%
+    summarise(
+      mean_jaccard = mean(max_jaccard, na.rm = TRUE),
+      median_jaccard = median(max_jaccard, na.rm = TRUE),
+      sd_jaccard = sd(max_jaccard, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    arrange(desc(mean_jaccard))
+  
+  print(region_stats)
+  
+  #Save statistics
+  write.csv(region_stats, file.path(out_dir, "summary_jaccard_region_stats.csv"), row.names = FALSE)
+  
+  #Vis: Distribution per region
+  
+  p_summary <- ggplot(summary_stats, aes(x = reorder(region, max_jaccard, FUN = median),
+                                         y = max_jaccard, fill = region)) +
+    geom_violin(trim = FALSE, alpha = 0.5, 
+                draw_quantiles = c(0.25, 0.5, 0.75)) +
+    #geom_boxplot(width = 0.15, outlier.shape = NA, fill = "white", color = "black", alpha = 0.8) +
+    scale_fill_brewer(palette = "Set1") +
+    labs(
+      title = "Average community similarity by region (AD vs Control)",
+      subtitle = "Distribution of maximum Jaccard index per AD module",
+      x = "Region",
+      y = "Maximum Jaccard similarity per module"
+    ) +
+    theme_classic(base_size = 14) +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold", size = 15, hjust = 0.5),
+      plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray30")
+    )
+  
+  out_summary_plot <- file.path(plot_dir, "Summary_Jaccard_Region_Distribution.png")
+  ggsave(out_summary_plot, plot = p_summary, width = 10, height = 6, dpi = 300)
+  message("Saved summary distribution plot: ", out_summary_plot)
 }
 
 #END

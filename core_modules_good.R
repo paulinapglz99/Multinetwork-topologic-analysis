@@ -127,6 +127,8 @@ if (length(files) < 2) stop("Se necesitan al menos dos archivos *_nodes_summary.
 #Get metadata --- ---
 meta <- do.call(rbind, lapply(files, extract_info))
 
+print(meta)
+
 #Get pairs!
 all_pairs <- build_pairs(meta)
 compare_and_export(all_pairs$AD_vs_AD, "ADvsAD")
@@ -136,7 +138,6 @@ compare_and_export(all_pairs$AD_vs_Control, "ADvsControl")
 message("Comparisons DONE!. Files are now in: ", output_dir)
 
 #Create summary of exclusive modules
-
 generate_exclusive_module_report <- function(ad_files, control_files, region) {
   ad_file <- ad_files %>% filter(region == !!region) %>% pull(filename)
   control_file <- control_files %>% filter(region == !!region) %>% pull(filename)
@@ -146,19 +147,36 @@ generate_exclusive_module_report <- function(ad_files, control_files, region) {
   
   jacmat <- jaccard_matrix(modAD, modCTRL)
   
-  ad_exclusive <- rownames(jacmat)[apply(jacmat, 1, max) < 0.3]
-  ctrl_exclusive <- colnames(jacmat)[apply(jacmat, 2, max) < 0.3]
+  # Calcular percentil 95 del índice de Jaccard
+  all_values <- as.vector(jacmat)
+  all_values <- all_values[!is.na(all_values) & all_values > 0]
+  p95 <- quantile(all_values, probs = 0.95, na.rm = TRUE)
   
+  message(sprintf("Región: %s | Percentil 95 del índice de Jaccard = %.4f", region, p95))
+  
+  # Identificar módulos exclusivos
+  ad_exclusive <- rownames(jacmat)[apply(jacmat, 1, max, na.rm = TRUE) < p95]
+  ctrl_exclusive <- colnames(jacmat)[apply(jacmat, 2, max, na.rm = TRUE) < p95]
+  
+  # Contar módulos exclusivos
+  n_ad_exclusive <- length(ad_exclusive)
+  n_ctrl_exclusive <- length(ctrl_exclusive)
+  
+  # Crear tabla resumen
   tibble(
     Region = region,
+    Jaccard_P95 = p95,
     AD_Modules_Exclusive = paste(ad_exclusive, collapse = ";"),
-    Control_Modules_Exclusive = paste(ctrl_exclusive, collapse = ";")
+    Control_Modules_Exclusive = paste(ctrl_exclusive, collapse = ";"),
+    N_AD_Modules_Exclusive = n_ad_exclusive,
+    N_Control_Modules_Exclusive = n_ctrl_exclusive
   )
 }
 
 #Execute for each common region
 summary_df <- bind_rows(
-  lapply(intersect(meta$region[meta$phenotype == "AD"], meta$region[meta$phenotype == "Control"]), function(region) {
+  lapply(intersect(meta$region[meta$phenotype == "AD"],
+                   meta$region[meta$phenotype == "Control"]), function(region) {
     generate_exclusive_module_report(
       ad_files = meta %>% filter(phenotype == "AD"),
       control_files = meta %>% filter(phenotype == "Control"),
@@ -170,13 +188,85 @@ summary_df <- bind_rows(
 #jeje
 summary_df$Region <- gsub("^(Mayo_|ROSMAP_)", "", summary_df$Region)
 
+print(summary_df)
+
 write.csv(summary_df, file = file.path(output_dir, "summary_exclusive_modules.csv"), row.names = FALSE)
 message("Core modules saved in 'summary_exclusive_modules.csv'")
 
-#Visualisation
+#Visualisation ----- -----
+
+#Jaccard values distribution
+
+if (length(jaccard_files) > 0) {
+  message("Generando distribución de valores Jaccard (log-transform)...")
+  
+  jaccard_data <- jaccard_files %>%
+    map_df(~{
+      mat <- as.matrix(read.csv(.x, row.names = 1))
+      tibble(
+        value = as.vector(mat),
+        comparison = case_when(
+          grepl("ADvsAD", basename(.x)) ~ "AD_vs_AD",
+          grepl("ControlvsControl", basename(.x)) ~ "Control_vs_Control",
+          grepl("ADvsControl", basename(.x)) ~ "AD_vs_Control",
+          TRUE ~ "Other"
+        )
+      )
+    })
+  
+  # Filtrar ceros y aplicar log transform
+  jaccard_data <- jaccard_data %>%
+    filter(value > 0) %>%
+    mutate(
+      log_value = log10(value + 1e-4)  # <- desplazamiento pequeño para evitar log(0)
+    )
+  
+  # Plot log-transformado
+  p_log <- ggplot(jaccard_data, aes(x = log_value, fill = comparison)) +
+    geom_density(alpha = 0.5) +
+    theme_minimal(base_size = 14) +
+    labs(
+      title = "Distribución logarítmica de valores de Jaccard",
+      x = expression(log[10]("Jaccard + 1e-4")),
+      y = "Densidad",
+      fill = "Comparación"
+    ) +
+    geom_vline(xintercept = log10(0.3 + 1e-4), linetype = "dashed", color = "red") +
+    annotate("text", x = log10(0.32), y = 5, label = "Umbral = 0.3", hjust = 0, color = "red")
+  
+  ggsave(
+    filename = file.path(output_dir, "jaccard_distribution_density_log.png"),
+    plot = p_log,
+    width = 8, height = 5
+  )
+  
+  message("Distribución logarítmica guardada en 'jaccard_distribution_density_log.png'")
+}
+
+# Agregar línea al gráfico log-transformado
+p_log <- p_log +
+  geom_vline(xintercept = log10(percentil_95 + 1e-4),
+             linetype = "dotted", color = "blue", size = 1) +
+  annotate("text",
+           x = log10(percentil_95 + 1e-4) + 0.1,
+           y = 4.5,
+           label = sprintf("P95 = %.3f", percentil_95),
+           hjust = 0, color = "blue", fontface = "italic")
+
+# Guardar de nuevo el gráfico actualizado
+ggsave(
+  filename = file.path(output_dir, "jaccard_distribution_density_log_p95.png"),
+  plot = p_log,
+  width = 8, height = 5)
+
+message("Distribución logarítmica actualizada con línea del percentil 95 guardada en 'jaccard_distribution_density_log_p95.png'")
 
 #Exclusive modules barplot per region --- ---
 #How many exclusive modules has each region?
+
+#Factors in order
+orden_regiones <- c("HCN", "PCC", "TC", "CRB","DLPFC")
+summary_df$Region <- factor(summary_df$Region, levels = orden_regiones)
 
 #Get long format
 summary_long <- summary_df %>%
@@ -202,9 +292,15 @@ n_exclusive.p <- ggplot(summary_long, aes(x = Region, y = Count, fill = Group)) 
   theme_minimal() +
   theme(
     axis.text.x = element_text(hjust = 1),
-    legend.position = "top"
+    #legend.position = "topleft",
+    legend.position = c(0.80, 0.98),  # Posición dentro del gráfico (x, y)
+    legend.justification = c(0, 1),   # Justificar desde la esquina superior izquierda
+    #legend.background = element_rect(fill = "transparent")  # Fondo transparente
   ) +
-  labs(title = "Número de módulos exclusivos por región", y = NULL, x = NULL)
+  #guides(fill = guide_legend(override.aes = list(shape = 21))) +  # Círculos en leyenda
+  labs(title = "Exclusive modules per region", y = NULL, x = NULL)
+
+n_exclusive.p
 
 #Save barplot
 ggsave(filename = file.path(output_dir, "barplot_exclusive_modules_ggplot.pdf"),
@@ -328,6 +424,3 @@ if (nrow(edges_df) > 0) {
 } else {
   message("⚠️ No se encontraron pares con Jaccard ≥ ", threshold, ". No se generó red.")
 }
-
-
-

@@ -38,11 +38,11 @@ opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
 input_dir <- opt$input_dir
-#input_dir <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_jaccard_1/"
+#opt$input_dir <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_jaccard_1/"
 output_dir <- opt$output_dir
-#output_dir <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/bipartite_nets"
+#opt$output_dir <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/bipartite_nets"
 threshold <- opt$threshold
-#threshold <-0.25
+#opt$threshold <-0.25
 
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
@@ -60,32 +60,24 @@ process_jaccard_file <- function(file_path) {
   #Get regions by file name
   file_name <- basename(file_path)
   region <- str_extract(file_name, "(?<=Jaccard_).+?(?=_counts_)")
-  
   #Read jaccard matrix Leer matriz Jaccard
   jaccard_mat <- vroom(file_path)
-  
   #Get names
   ad_nodes <- jaccard_mat[[1]]
   ctrl_nodes <- colnames(jaccard_mat)[-1]
-  
   #threshold
   threshold <- opt$threshold
-  
   #Long format to set threshold
   edges_df <- jaccard_mat %>%
     pivot_longer(-1, names_to = "ctrl", values_to = "weight") %>%
     rename(ad = 1) %>%
     filter(weight >= threshold)
-  
   #build graph from data frame
   g <- graph_from_data_frame(edges_df, directed = FALSE)
-  
   #Set attribute (bipartite)
   V(g)$type <- str_detect(V(g)$name, "^ctrl")
-  
-  #Atributo de fenotipo
+  #Phenotype attribute
   V(g)$phenotype <- ifelse(str_detect(V(g)$name, "^ctrl"), "control", "AD")
-  
   #Export as graphml
   output_file <- file.path(output_dir, paste0(region, "_bipartite.graphml"))
   write_graph(g, output_file, format = "graphml")

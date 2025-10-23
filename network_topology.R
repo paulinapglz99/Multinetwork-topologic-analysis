@@ -278,9 +278,41 @@ fwrite(summaries, file.path(opt$out_dir, "networks_summary.csv"))
 
 #Save metadata about per-node outputs
 node_paths <- rbindlist(lapply(results, function(x) {
-  if (!is.null(x) && !is.na(x$node_table)) data.table(file = x$summary$file, node_table = x$node_table) else NULL
+  if (!is.null(x) && !is.na(x$node_table)) data.table(file = x$summary$file, node_table = x$node_table, ) else NULL
 }), fill = TRUE)
 if (nrow(node_paths) > 0) fwrite(node_paths, file.path(opt$out_dir, "networks_nodes_index.csv"))
+
+# # Extraer metadata del nombre del archivo
+# extract_metadata <- function(fname) {
+#   # Ejemplo: "Mayo_CRB_counts_AD_top10pct"
+#   fname_noext <- tools::file_path_sans_ext(fname)
+#   
+#   # Regex para extraer: <cohorte>_<region>_counts_<condition>_top*
+#   match <- str_match(fname_noext, "^(.*?)_(.*?)_counts_(AD|control)_")
+#   data.table(
+#     file_name = fname_noext,
+#     region = match[, 3],
+#     condition = match[, 4]
+#   )
+# }
+# 
+# # Construir metadata completa
+# extract_metadata <- function(fname) {
+#   fname_noext <- tools::file_path_sans_ext(fname)
+#   
+#   # Regex más flexible:
+#   # Captura: cohorte, región anatómica y diagnóstico (AD o control)
+#   # Ejemplo válido: ROSMAP_PCC_counts_AD, Mayo_TC_counts_control_top10pct
+#   match <- stringr::str_match(fname_noext,
+#                               "^([A-Za-z0-9]+)_([A-Za-z0-9]+)_counts_(AD|control)")
+#   
+#   data.table(
+#     file_name = fname_noext,
+#     cohort = match[, 2],
+#     region = match[, 3],
+#     condition = match[, 4]
+#   )
+# }
 
 cat("Analysis completed. Summary saved in:", file.path(opt$out_dir, "networks_summary.csv"), "\n")
 

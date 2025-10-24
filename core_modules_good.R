@@ -23,8 +23,7 @@ option_list <- list(
   make_option(c("-o", "--output_dir"), type = "character", default = "./results_jaccard",
               help = "Directorio de salida [default: %default]", metavar = "character"),
   make_option(c("-p", "--pattern"), type = "character", default = "_nodes_summary\\.csv$",
-              help = "Regex para seleccionar archivos [default: %default]", metavar = "character")
-)
+              help = "Regex para seleccionar archivos [default: %default]", metavar = "character"))
 
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
@@ -138,7 +137,8 @@ compare_and_export(all_pairs$AD_vs_Control, "ADvsControl")
 message("Comparisons DONE!. Files are now in: ", output_dir)
 
 #Create summary of exclusive modules
-generate_exclusive_module_report <- function(ad_files, control_files, region) {
+
+generate_exclusive_module_report <- function(ad_files, control_files, region, threshold) {
   ad_file <- ad_files %>% filter(region == !!region) %>% pull(filename)
   control_file <- control_files %>% filter(region == !!region) %>% pull(filename)
   
@@ -147,25 +147,25 @@ generate_exclusive_module_report <- function(ad_files, control_files, region) {
   
   jacmat <- jaccard_matrix(modAD, modCTRL)
   
-  # Calcular percentil 95 del índice de Jaccard
+  #Calculate the 95th percentile of the Jaccard index
   all_values <- as.vector(jacmat)
   all_values <- all_values[!is.na(all_values) & all_values > 0]
-  p95 <- quantile(all_values, probs = 0.95, na.rm = TRUE)
+  threshold <- quantile(all_values, probs = 0.98, na.rm = TRUE)
   
-  message(sprintf("Región: %s | Percentil 95 del índice de Jaccard = %.4f", region, p95))
+  message(sprintf("Region: %s | Threshold of the Jaccard index= %.4f", region, threshold))
   
-  # Identificar módulos exclusivos
-  ad_exclusive <- rownames(jacmat)[apply(jacmat, 1, max, na.rm = TRUE) < p95]
-  ctrl_exclusive <- colnames(jacmat)[apply(jacmat, 2, max, na.rm = TRUE) < p95]
+  #Identify exclusive modules 
+  ad_exclusive <- rownames(jacmat)[apply(jacmat, 1, max, na.rm = TRUE) < threshold]
+  ctrl_exclusive <- colnames(jacmat)[apply(jacmat, 2, max, na.rm = TRUE) < threshold]
   
-  # Contar módulos exclusivos
+  #Count exclusive modules
   n_ad_exclusive <- length(ad_exclusive)
   n_ctrl_exclusive <- length(ctrl_exclusive)
   
-  # Crear tabla resumen
-  tibble(
+  #final dataframe
+  data.frame(
     Region = region,
-    Jaccard_P95 = p95,
+    Jaccard_P95 = threshold,
     AD_Modules_Exclusive = paste(ad_exclusive, collapse = ";"),
     Control_Modules_Exclusive = paste(ctrl_exclusive, collapse = ";"),
     N_AD_Modules_Exclusive = n_ad_exclusive,
@@ -173,14 +173,15 @@ generate_exclusive_module_report <- function(ad_files, control_files, region) {
   )
 }
 
-#Execute for each common region
+#Execute summary for each common region
 summary_df <- bind_rows(
   lapply(intersect(meta$region[meta$phenotype == "AD"],
                    meta$region[meta$phenotype == "Control"]), function(region) {
     generate_exclusive_module_report(
       ad_files = meta %>% filter(phenotype == "AD"),
       control_files = meta %>% filter(phenotype == "Control"),
-      region = region
+      region = region, 
+      threshold = 0.98
     )
   })
 ) 
@@ -196,6 +197,9 @@ message("Core modules saved in 'summary_exclusive_modules.csv'")
 #Visualisation ----- -----
 
 #Jaccard values distribution
+
+# Cargar todos los archivos *_jaccard_matrix.csv del output_dir
+jaccard_files <- list.files(output_dir, pattern = "_jaccard_matrix\\.csv$", full.names = TRUE)
 
 if (length(jaccard_files) > 0) {
   message("Generando distribución de valores Jaccard (log-transform)...")
@@ -235,23 +239,16 @@ if (length(jaccard_files) > 0) {
     annotate("text", x = log10(0.32), y = 5, label = "Umbral = 0.3", hjust = 0, color = "red")
   
   ggsave(
-    filename = file.path(output_dir, "jaccard_distribution_density_log.png"),
+    filename = file.path(output_dir, "jaccard_distribution_density_log.pdf"),
     plot = p_log,
-    width = 8, height = 5
+    width = 8,
+    height = 5, 
+    device = "pdf",
+    units = "cm"
   )
   
-  message("Distribución logarítmica guardada en 'jaccard_distribution_density_log.png'")
+  message("Logarithmic distribution of Jaccard values saved in 'jaccard_distribution_density_log.png''")
 }
-
-# Agregar línea al gráfico log-transformado
-p_log <- p_log +
-  geom_vline(xintercept = log10(percentil_95 + 1e-4),
-             linetype = "dotted", color = "blue", size = 1) +
-  annotate("text",
-           x = log10(percentil_95 + 1e-4) + 0.1,
-           y = 4.5,
-           label = sprintf("P95 = %.3f", percentil_95),
-           hjust = 0, color = "blue", fontface = "italic")
 
 # Guardar de nuevo el gráfico actualizado
 ggsave(

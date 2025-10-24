@@ -123,7 +123,6 @@ jaccards.tb$Region <- gsub("^(Mayo_|ROSMAP_)", "", jaccards.tb$Region)
 #Factors in order
 ordered_regions <- c("HCN", "PCC", "TC", "CRB","DLPFC")
 jaccards.tb$Region <- factor(jaccards.tb$Region, levels = ordered_regions)
-
 print(table(jaccards.tb$Classification))
 
 #Save results
@@ -156,12 +155,7 @@ ggsave(filename = file.path(output_dir, "jaccard_histogram.pdf"),
        width = 10, 
        height = 7)
 
-
-
-
-
-
-#Filter exclusive modules
+#Filter exclusive modules --- ---
 candidates_exclusive_modules <- jaccards.tb %>%
   filter(Classification %in% c("Dissimilar", "Similar"))
 
@@ -209,7 +203,6 @@ ggsave(filename = file.path(output_dir, "similar_dissimilar_barplot.pdf"),
 
 message("First Jaccard comparison completed and table saved!")
 
-
 #A module is considered unique to a phenotype (e.g., AD) if it has no similar module in the opposite phenotype in the same region.
 #This means:
 #If an X_AD module does not have any Y_Control modules with Jaccard_Index ≥ upp_thres → it is AD-exclusive.
@@ -218,7 +211,7 @@ message("First Jaccard comparison completed and table saved!")
 #Check if there is at least one row with Classification == ‘Similar’ → then it is NOT exclusive.
 #If no row has ‘Similar’, then this Module_AD is AD-exclusive.
 
-#Extraer módulos AD y Control por región
+#Extract AD and Control modules by region
 
 exclusive_AD <- jaccards.tb %>%
   group_by(Region, Module_AD) %>%
@@ -240,40 +233,97 @@ exclusive_CTRL <- jaccards.tb %>%
   select(Region, Module_Control) %>%
   mutate(Phenotype = "Control_exclusive")
 
-# 2️⃣ Unir resultados en una sola tabla
+#Bind results
 exclusive_modules <- bind_rows(
   exclusive_AD %>% rename(Module = Module_AD),
   exclusive_CTRL %>% rename(Module = Module_Control)
 )
 
-# 3️⃣ Guardar resultados
+#Save results
 fwrite(exclusive_modules, file = file.path(output_dir, "exclusive_modules_AD_CTRL.csv"))
 
-# 4️⃣ Resumen por región
+#Summary per region
 exclusive_summary <- exclusive_modules %>%
   group_by(Region, Phenotype) %>%
   summarise(n_modules = n(), .groups = "drop")
 
+# Extraer info desde los nombres de 'modules'
+modules_info <- data.frame(
+  Module = names(modules),
+  stringsAsFactors = FALSE
+) %>%
+  mutate(
+    Region = sub("^(Mayo_|ROSMAP_)?([A-Z]+)_.*$", "\\2", Module),
+    Phenotype = ifelse(grepl("_AD_", Module), "AD_exclusive", "Control_exclusive")
+  )
+
+# Contar total de módulos por región y fenotipo
+total_modules_per_group <- modules_info %>%
+  group_by(Region, Phenotype) %>%
+  summarise(total_modules = n(), .groups = "drop")
+
+# --- Unir con resumen de módulos exclusivos --- #
+exclusive_normalized <- exclusive_summary %>%
+  left_join(total_modules_per_group, by = c("Region", "Phenotype")) %>%
+  mutate(Proportion_Exclusive = n_modules / total_modules)
+
+# Guardar tabla normalizada
+fwrite(exclusive_normalized, file = file.path(output_dir, "exclusive_modules_normalized_summary.csv"))
+
+# Mostrar tabla en consola
+message("Proporción de módulos exclusivos normalizada por región:")
+print(exclusive_normalized)
+
+
+
+
+
+
+
+
+
+
+
 fwrite(exclusive_summary, file = file.path(output_dir, "exclusive_modules_summary.csv"))
 
-# 5️⃣ (Opcional) Mostrar resultados en consola
-message("Resumen de módulos exclusivos por región:")
+
+
+message("Summary of exclusive modules by region:")
 print(exclusive_summary)
 
-# 6️⃣ (Opcional) Visualización rápida
-ggplot(exclusive_summary, aes(x = Region, y = n_modules, fill = Phenotype)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  geom_text(aes(label = n_modules), vjust = -0.3, size = 3.5, position = position_dodge(width = 0.8)) +
-  labs(
-    title = "Número de módulos exclusivos por región y fenotipo",
-    x = "Región cerebral",
-    y = "Número de módulos exclusivos",
-    fill = "Fenotipo"
-  ) +
+#check
+
+#Factors in order
+ordered_regions <- c("HCN", "PCC", "TC", "DLPFC", "CRB")
+exclusive_summary$Region <- factor(exclusive_summary$Region, levels = ordered_regions)
+
+#Get cool colors
+fill_colors <- c("AD_exclusive" = rgb(0.3, 0.1, 0.4, 0.6),
+                 "Control_exclusive" = rgb(0.3, 0.5, 0.4, 0.6))
+
+exclusive.p <- ggplot(exclusive_summary, aes(x = Region, y = n_modules, fill = Phenotype))  +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(aes(label = paste0("n: ", n_modules)),
+            position = position_dodge(width = 0.8),
+            vjust = -0.3, size = 3.5) +
+  scale_fill_manual(values = fill_colors) +
+  labs(title = "Exclusive Modules by Region and Phenotype",
+       x = "Brain Region",
+       y = "Number of Exclusive Modules",
+       fill = "Classification") +
   theme_minimal(base_size = 14) +
   theme(
-    plot.title = element_text(face = "bold", hjust = 0.5),
-    axis.text.x = element_text(angle = 0, hjust = 0.5),
-    legend.position = "top")
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    axis.title.x = element_text(size = 13, face = "bold"),
+    axis.title.y = element_text(size = 13, face = "bold"),
+    axis.text.x = element_text(angle = 0, size = 11, margin = margin(t = -5)),
+    axis.text.y = element_text(size = 11),
+    legend.position = c(0.7, 0.98),
+    legend.justification = c(0, 1),
+    legend.title = element_text(face = "bold"),
+    legend.background = element_rect(fill = alpha("white", 0.7), color = NA),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank())
+exclusive.p 
 
 #"desacuerdo fenotípico"

@@ -74,6 +74,11 @@ jaccard_index <- function(a, b) {
 files <- list.files(input_dir, pattern = pattern, full.names = TRUE)
 meta <- do.call(rbind, lapply(files, extract_info))
 module_list <- lapply(files, load_modules)
+names(module_list) <- basename(files)
+# Guardar si quieres
+fwrite(module_counts, file.path(output_dir, "total_modules_per_network.csv"))
+
+
 modules <- unlist(module_list, recursive = FALSE)
 
 #FIRST: COMPARE NETWORKS IN EACH REGION PER PHENOTYPE TO FIND AD-exclusive and ctrl-exclusive modules in each region
@@ -242,51 +247,41 @@ exclusive_modules <- bind_rows(
 #Save results
 fwrite(exclusive_modules, file = file.path(output_dir, "exclusive_modules_AD_CTRL.csv"))
 
-#Summary per region
-exclusive_summary <- exclusive_modules %>%
-  group_by(Region, Phenotype) %>%
-  summarise(n_modules = n(), .groups = "drop")
+#Summary per region --- ---
 
-# Extraer info desde los nombres de 'modules'
-modules_info <- data.frame(
-  Module = names(modules),
-  stringsAsFactors = FALSE
+#Count modules --- 
+module_counts <- tibble(
+  File = names(module_list),
+  N_Modules = sapply(module_list, length)
 ) %>%
   mutate(
-    Region = sub("^(Mayo_|ROSMAP_)?([A-Z]+)_.*$", "\\2", Module),
-    Phenotype = ifelse(grepl("_AD_", Module), "AD_exclusive", "Control_exclusive")
+    Region = sub("_counts_.*", "", File),
+    Phenotype = case_when(
+      grepl("_AD_", File) ~ "AD",
+      grepl("_control_", File) ~ "Control",
+      TRUE ~ "Unknown"
+    )
+  ) %>%
+  mutate(
+    Region = gsub("^(Mayo_|ROSMAP_)", "", Region),
+    Phenotype = paste0(Phenotype, "_exclusive")  # para hacer match con exclusive_summary
   )
 
-# Contar total de módulos por región y fenotipo
-total_modules_per_group <- modules_info %>%
+exclusive_summary <- exclusive_modules %>%
   group_by(Region, Phenotype) %>%
-  summarise(total_modules = n(), .groups = "drop")
+  summarise(n_modules = n(), .groups = "drop") %>% 
+  left_join(module_counts, by = c("Region", "Phenotype")) %>%
+  select(Region, Phenotype, n_modules, N_Modules) %>% 
+  mutate(Proportion = n_modules / N_Modules * 100)
 
-# --- Unir con resumen de módulos exclusivos --- #
-exclusive_normalized <- exclusive_summary %>%
-  left_join(total_modules_per_group, by = c("Region", "Phenotype")) %>%
-  mutate(Proportion_Exclusive = n_modules / total_modules)
-
-# Guardar tabla normalizada
+#Save exclusive modules summary
 fwrite(exclusive_normalized, file = file.path(output_dir, "exclusive_modules_normalized_summary.csv"))
 
 # Mostrar tabla en consola
 message("Proporción de módulos exclusivos normalizada por región:")
 print(exclusive_normalized)
 
-
-
-
-
-
-
-
-
-
-
 fwrite(exclusive_summary, file = file.path(output_dir, "exclusive_modules_summary.csv"))
-
-
 
 message("Summary of exclusive modules by region:")
 print(exclusive_summary)
@@ -326,4 +321,57 @@ exclusive.p <- ggplot(exclusive_summary, aes(x = Region, y = n_modules, fill = P
     panel.grid.minor = element_blank())
 exclusive.p 
 
-#"desacuerdo fenotípico"
+exclusive_v2.p <- ggplot(exclusive_summary, aes(x = Region, fill = Phenotype)) +
+  geom_bar(aes(y = N_Modules),
+           stat = "identity",
+           position = position_dodge(),
+           alpha = 0.3,
+           color = NA) +
+  geom_bar(aes(y = n_modules),
+           stat = "identity",
+           position = position_dodge(),
+           #color = "black",
+           size = 0.2) +
+  geom_text(aes(y = n_modules,
+                label = sprintf("%.1f%%", Proportion)),
+            position = position_dodge(width = 0.9),
+            vjust = -0.8,
+            size = 4,
+            family = "sans") +
+  scale_fill_manual(values = fill_colors) +
+  labs(
+    title = "Exclusive Modules Across Brain Regions",
+    x = "Brain Region",
+    y = "Exclusive Module Count",
+    fill = "Phenotype"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(face = "bold"),
+    legend.position = "top",
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 12),
+    panel.grid = element_blank(),
+    #panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+  )
+exclusive_v2.p
+
+# EL "desacuerdo fenotípico"
+#¿Existen módulos AD-exclusivos que estén presentes (conservados) en varias regiones?
+# ¿Hay módulos Control-exclusivos que también aparezcan en múltiples regiones?
+
+#Tomas los módulos AD-exclusivos de cada región, por ejemplo:
+# 
+# Mayo_CRB_AD_12, Mayo_PCC_AD_3, etc.
+# 
+# Y luego comparas cada par entre regiones usando, por ejemplo, índice de Jaccard entre sus genes.
+# 
+# Si dos módulos de distintas regiones tienen un índice de Jaccard ≥ umbral (ej. 0.8), los consideras “conservados entre regiones”.
+
+
+
+
+

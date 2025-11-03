@@ -28,8 +28,8 @@ option_list <- list(
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 #Inputs
-opt$input_dir <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_topos/"
-opt$output_dir <- "/datos/rosmap/multiregion_networks/networks_final/networks_filtered/results_core_modules_5"
+opt$input_dir <- "~/Desktop/local_work/results_topos/"
+opt$output_dir <- "~/Desktop/local_work/results_topos/results_core_modules"
 
 input_dir <- opt$input_dir
 output_dir <- opt$output_dir
@@ -74,19 +74,27 @@ jaccard_index <- function(a, b) {
 files <- list.files(input_dir, pattern = pattern, full.names = TRUE)
 meta <- do.call(rbind, lapply(files, extract_info))
 module_list <- lapply(files, load_modules)
-names(module_list) <- basename(files)
-# Guardar si quieres
-fwrite(module_counts, file.path(output_dir, "total_modules_per_network.csv"))
-
+#names(module_list) <- basename(files)
 
 modules <- unlist(module_list, recursive = FALSE)
-
 #FIRST: COMPARE NETWORKS IN EACH REGION PER PHENOTYPE TO FIND AD-exclusive and ctrl-exclusive modules in each region
 
 #Comparison between phenotypes by region
 
 #Extract unique names from regions
+#jeje
+meta$region <- gsub("^(Mayo_|ROSMAP_)", "", meta$region)
 regions <- unique(meta$region)
+#Count modules per network
+module_counts <- tibble(
+  #file = basename(files),
+  Region = meta$region,
+  Phenotype = meta$phenotype,
+  N_modules = sapply(module_list, length),
+  Network = paste0(Region, "_", Phenotype)
+)
+module_counts <- module_counts %>% 
+  dplyr::select(N_modules, Network)
 
 #Thresholds
 upp_thres <- 0.8
@@ -123,26 +131,28 @@ for (current_region in regions) {
 
 #Bind results
 jaccards.tb <- rbindlist(jaccards)
-#jeje
-jaccards.tb$Region <- gsub("^(Mayo_|ROSMAP_)", "", jaccards.tb$Region)
 #Factors in order
 ordered_regions <- c("HCN", "PCC", "TC", "CRB","DLPFC")
 jaccards.tb$Region <- factor(jaccards.tb$Region, levels = ordered_regions)
 print(table(jaccards.tb$Classification))
 
 #Save results
-fwrite(jaccards.tb, file = file.path(output_dir, "jaccard_summary_by_region.csv"))
+fwrite(jaccards.tb, file = file.path(output_dir, "jaccards_all_regions.csv"))
 
 #Histogram of Jaccard values
+
 jaccard_hist.p <- ggplot(jaccards.tb, aes(x = Jaccard_Index)) +
-  geom_histogram(binwidth = 0.005, fill = "navyblue", color = "black") +
-  geom_vline(xintercept = c(low_thres, upp_thres), linetype = "dashed", color = c("red", "darkgreen"), size = 1) +
-  scale_y_log10() +
+  geom_histogram(binwidth = binwidth_value, fill = "navyblue", color = "black", alpha = 0.7) +
+  geom_density(aes(y = ..count.. * 0.005), color = "orange", size = 1) +
+  geom_vline(xintercept = low_thres, linetype = "dashed", color = "red", size = 1) +
+  geom_vline(xintercept = upp_thres, linetype = "dashed", color = "darkgreen", size = 1) +
+  scale_y_continuous(trans = "log10", limits = c(1, NA)) +  # evita problemas con ceros
   labs(
     title = "Distribution of Jaccard Index Between Modules (AD vs Control)",
     x = "Jaccard Index",
-    y = "Frequency (log)"
+    y = "Frequency (log10)"
   ) +
+ # facet_wrap(~Region) +
   theme_minimal(base_size = 14) +
   theme(
     plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
@@ -152,6 +162,7 @@ jaccard_hist.p <- ggplot(jaccards.tb, aes(x = Jaccard_Index)) +
     panel.grid.minor = element_blank(),
     panel.grid.major.x = element_blank()
   )
+
 jaccard_hist.p
 
 #Save histogram
@@ -249,42 +260,23 @@ fwrite(exclusive_modules, file = file.path(output_dir, "exclusive_modules_AD_CTR
 
 #Summary per region --- ---
 
-#Count modules --- 
-module_counts <- tibble(
-  File = names(module_list),
-  N_Modules = sapply(module_list, length)
-) %>%
-  mutate(
-    Region = sub("_counts_.*", "", File),
-    Phenotype = case_when(
-      grepl("_AD_", File) ~ "AD",
-      grepl("_control_", File) ~ "Control",
-      TRUE ~ "Unknown"
-    )
-  ) %>%
-  mutate(
-    Region = gsub("^(Mayo_|ROSMAP_)", "", Region),
-    Phenotype = paste0(Phenotype, "_exclusive")  # para hacer match con exclusive_summary
-  )
-
 exclusive_summary <- exclusive_modules %>%
   group_by(Region, Phenotype) %>%
-  summarise(n_modules = n(), .groups = "drop") %>% 
-  left_join(module_counts, by = c("Region", "Phenotype")) %>%
-  select(Region, Phenotype, n_modules, N_Modules) %>% 
-  mutate(Proportion = n_modules / N_Modules * 100)
-
-#Save exclusive modules summary
-fwrite(exclusive_normalized, file = file.path(output_dir, "exclusive_modules_normalized_summary.csv"))
-
-# Mostrar tabla en consola
-message("Proporción de módulos exclusivos normalizada por región:")
-print(exclusive_normalized)
+  summarise(n_modules = n(), .groups = "drop")%>% 
+  mutate(Network = paste0(Region, "_", gsub("_exclusive", "", Phenotype)))%>% 
+  #left_join(module_counts, by = c("Region", "Phenotype")) %>%
+  left_join(module_counts) %>%
+  select(Region, Phenotype, n_modules, N_modules) %>% 
+  mutate(Proportion_exclusive = n_modules / N_modules * 100) %>%
+  arrange(desc(Proportion_exclusive))
+exclusive_summary
 
 fwrite(exclusive_summary, file = file.path(output_dir, "exclusive_modules_summary.csv"))
-
 message("Summary of exclusive modules by region:")
 print(exclusive_summary)
+
+#DLPFC muestra más módulos "compartidos" entre AD y Control → podría reflejar una transición gradual o plasticidad en esta región.
+#CRB y TC muestran módulos altamente específicos → pueden tener procesos moleculares altamente diferenciados entre fenotipos.
 
 #check
 
@@ -322,7 +314,7 @@ exclusive.p <- ggplot(exclusive_summary, aes(x = Region, y = n_modules, fill = P
 exclusive.p 
 
 exclusive_v2.p <- ggplot(exclusive_summary, aes(x = Region, fill = Phenotype)) +
-  geom_bar(aes(y = N_Modules),
+  geom_bar(aes(y = N_modules),
            stat = "identity",
            position = position_dodge(),
            alpha = 0.3,
@@ -359,17 +351,49 @@ exclusive_v2.p <- ggplot(exclusive_summary, aes(x = Region, fill = Phenotype)) +
   )
 exclusive_v2.p
 
+#Ahora lo escalamos
+
+
+
 # EL "desacuerdo fenotípico"
 #¿Existen módulos AD-exclusivos que estén presentes (conservados) en varias regiones?
 # ¿Hay módulos Control-exclusivos que también aparezcan en múltiples regiones?
 
 #Tomas los módulos AD-exclusivos de cada región, por ejemplo:
-# 
-# Mayo_CRB_AD_12, Mayo_PCC_AD_3, etc.
+#
+# Mayo_CRB_AD_, Mayo_PCC_AD_3, etc.
 # 
 # Y luego comparas cada par entre regiones usando, por ejemplo, índice de Jaccard entre sus genes.
 # 
 # Si dos módulos de distintas regiones tienen un índice de Jaccard ≥ umbral (ej. 0.8), los consideras “conservados entre regiones”.
+#
+
+#Impact index 
+#Esto te muestra directamente cuál área tiene más peso de módulos AD_exclusivos respecto al total.
+
+#Afectacion relativa = ADexclusive / (ADexclusive + Controlexclusive)
+
+impact_index <- exclusive_summary %>%
+  select(Region, Phenotype, n_modules) %>%
+  pivot_wider(names_from = Phenotype, values_from = n_modules) %>%
+  mutate(AD_impact_ratio = AD_exclusive / (AD_exclusive + Control_exclusive)) %>%
+  arrange(desc(AD_impact_ratio))
+
+impact_index
+
+ggplot(impact_index, aes(x = reorder(Region, AD_impact_ratio), y = AD_impact_ratio)) +
+  geom_col(fill = "#8E44AD") +
+  coord_flip() +
+  geom_text(aes(label = sprintf("%.1f%%", AD_impact_ratio * 100)), hjust = -0.1) +
+  labs(
+    title = "Índice de afectación relativa (AD vs Control)",
+    x = "Región cerebral",
+    y = "Proporción de módulos exclusivos de AD"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+
 
 
 

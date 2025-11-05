@@ -13,7 +13,8 @@ pacman::p_load(
   tools,
   optparse,
   ggplot2,
-  igraph
+  igraph, 
+  cowplot
 )
 
 #Parser
@@ -77,14 +78,22 @@ module_list <- lapply(files, load_modules)
 #names(module_list) <- basename(files)
 
 modules <- unlist(module_list, recursive = FALSE)
+# Filter modules with at least N genes
+min_genes <- 10
+modules <- modules[sapply(modules, length) >= min_genes]
+
 #FIRST: COMPARE NETWORKS IN EACH REGION PER PHENOTYPE TO FIND AD-exclusive and ctrl-exclusive modules in each region
 
 #Comparison between phenotypes by region
 
 #Extract unique names from regions
-#jeje
 meta$region <- gsub("^(Mayo_|ROSMAP_)", "", meta$region)
 regions <- unique(meta$region)
+
+# Recalcular `module_list` filtrando por tamaño mínimo
+module_list <- lapply(module_list, function(mods) {
+  mods[sapply(mods, length) >= min_genes]
+})
 
 #Count modules per network
 module_counts <- tibble(
@@ -143,8 +152,8 @@ fwrite(jaccards.tb, file = file.path(output_dir, "jaccards_all_regions.csv"))
 #Histogram of Jaccard values
 
 jaccard_hist.p <- ggplot(jaccards.tb, aes(x = Jaccard_Index)) +
-  geom_histogram(binwidth = 0.005, fill = "navyblue", color = "black", alpha = 0.7) +
-  geom_density(aes(y = ..count.. * 0.005), color = "orange", size = 1) +
+  geom_histogram(binwidth = 0.02, fill = "navyblue", color = "black", alpha = 0.7) +
+  #geom_density(aes(y = ..count.. * 0.005), adjust = 10,  na.rm = TRUE, color = "orange", size = 1) +
   geom_vline(xintercept = low_thres, linetype = "dashed", color = "red", size = 1) +
   geom_vline(xintercept = upp_thres, linetype = "dashed", color = "darkgreen", size = 1) +
   scale_y_continuous(trans = "log10", limits = c(1, NA)) +  # evita problemas con ceros
@@ -156,9 +165,9 @@ jaccard_hist.p <- ggplot(jaccards.tb, aes(x = Jaccard_Index)) +
   # facet_wrap(~Region) +
   theme_minimal(base_size = 14) +
   theme(
-    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-    axis.title.x = element_text(face = "bold", size = 13, margin = margin(t = 10)),
-    axis.title.y = element_text(face = "bold", size = 13, margin = margin(r = 10)),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    axis.title.x = element_text(size = 9),
+    axis.title.y = element_text(size = 9),
     axis.text = element_text(size = 11),
     panel.grid.minor = element_blank(),
     panel.grid.major.x = element_blank()
@@ -189,13 +198,11 @@ jaccard_hist.p
 #   )
 # jaccard_region.p
 
-library(cowplot)
-
-# Lista de gráficos por región
+#Plot per region (then grid them)
 jaccard_region.p <- lapply(levels(jaccards.tb$Region), function(reg) {
   ggplot(jaccards.tb %>% filter(Region == reg), aes(x = Jaccard_Index)) +
-    geom_histogram(binwidth = 0.005, fill = "navyblue", color = "black", alpha = 0.7) +
-    geom_density(aes(y = ..count.. * 0.005), color = "orange", size = 1) +
+    geom_histogram(binwidth = 0.02, fill = "navyblue", color = "black", alpha = 0.7) +
+    #geom_density(aes(y = ..count.. * 0.005), color = "orange", size = 1) +
     geom_vline(xintercept = low_thres, linetype = "dashed", color = "red", size = 1) +
     geom_vline(xintercept = upp_thres, linetype = "dashed", color = "darkgreen", size = 1) +
     scale_y_continuous(trans = "log10", limits = c(1, NA)) +
@@ -214,26 +221,21 @@ jaccard_region.p <- lapply(levels(jaccards.tb$Region), function(reg) {
     )
 })
 
-# Panel de 2 filas x 3 columnas (ajustar ncol/nrow según número de regiones)
-jaccard_region.p <- cowplot::plot_grid(plotlist = plots_por_region, ncol = 3)
-jaccard_region.p
-
+#Panel
 jaccard.p <- plot_grid(jaccard_hist.p, 
-                       plots_por_region[[1]], 
-                       plots_por_region[[2]],
-                       plots_por_region[[3]],
-                       plots_por_region[[4]],
-                       plots_por_region[[5]],
+                       jaccard_region.p[[1]], 
+                       jaccard_region.p[[2]],
+                       jaccard_region.p[[3]],
+                       jaccard_region.p[[4]],
+                       jaccard_region.p[[5]],
                        ncol = 3)
 jaccard.p
 
-#Save histogram
+#Save histograms
 ggsave(filename = file.path(output_dir, "jaccard_histogram.pdf"), 
        plot = jaccard_hist.p, 
        width = 10, 
        height = 7)
-
-#all --- ---
 
 #A module is considered unique to a phenotype (e.g., AD) if it has no similar module in the opposite phenotype in the same region.
 #This means:
@@ -243,7 +245,7 @@ ggsave(filename = file.path(output_dir, "jaccard_histogram.pdf"),
 #Check if there is at least one row with Classification == ‘Similar’ → then it is NOT exclusive.
 #If no row has ‘Similar’, then this Module_AD is AD-exclusive.
 
-# Clasificación extendida para módulos AD
+#Reorder modules to have a summary table 
 classified_AD <- jaccards.tb %>%
   group_by(Region, Module_AD) %>%
   summarise(
@@ -261,7 +263,6 @@ classified_AD <- jaccards.tb %>%
   rename(Module = Module_AD) %>%
   mutate(Phenotype = "AD")
 
-# Clasificación extendida para módulos Control
 classified_CTRL <- jaccards.tb %>%
   group_by(Region, Module_Control) %>%
   summarise(
@@ -279,10 +280,10 @@ classified_CTRL <- jaccards.tb %>%
   rename(Module = Module_Control) %>%
   mutate(Phenotype = "Control")
 
-# Unir ambas tablas
+#Bind tables
 classified_all <- bind_rows(classified_AD, classified_CTRL)
 
-# Contar módulos por clasificación y región
+#Make a summary per classification and region
 summary_all <- classified_all %>%
   group_by(Region, Phenotype, Classification) %>%
   summarise(n_modules = n(), .groups = "drop") %>%
@@ -300,11 +301,13 @@ fwrite(summary_all, file = file.path(output_dir, "modules_classification_summary
 
 #Get cool colors
 fill_colors <- c(
-  "Control_exclusive" = rgb(0.1, 0.4, 0.3, 0.6),   # verde oscuro
-  "Intermediate"      = rgb(0.4, 0.6, 0.3, 0.6),   # verde oliva
-  "Similar"           = rgb(0.4, 0.3, 0.6, 0.6),   # violeta suave
-  "AD_exclusive"      = rgb(0.6, 0.2, 0.5, 0.6)    # magenta profundo
+  "Control_exclusive" = rgb(0.1, 0.4, 0.3, 0.6),   #dark green
+  "Intermediate"      = rgb(0.4, 0.6, 0.3, 0.6),   #olive green
+  "Similar"           = rgb(0.4, 0.3, 0.6, 0.6),   #soft violeta
+  "AD_exclusive"      = rgb(0.6, 0.2, 0.5, 0.6)    #magenta
 )
+
+#Plot stacked barplot per local proportion
 
 local.p <- ggplot(summary_all, aes(x = Region, y = local_proportion, fill = Classification)) +
   geom_bar(stat = "identity", position = "stack", color = "white", linewidth = 0.3) +
@@ -321,7 +324,7 @@ local.p
 
 #Visualize global proportion
 
-# Graficar proporción por región
+#Plot proportions per region (global proportion)
 global.p <- ggplot(summary_all, aes(x = Region, y = global_proportion, fill = Classification)) +
   geom_bar(stat = "identity", position = "stack") +
   scale_fill_manual(values = fill_colors) +
@@ -337,6 +340,10 @@ global.p <- ggplot(summary_all, aes(x = Region, y = global_proportion, fill = Cl
   )
 global.p 
 
+#Grid plot
+plot_grid(local.p, global.p)
+
+
 jaccard_heatmap.p <- ggplot(summary_all, aes(x = Region, y = Classification, fill = global_proportion)) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "C") +
@@ -344,16 +351,6 @@ jaccard_heatmap.p <- ggplot(summary_all, aes(x = Region, y = Classification, fil
   theme_minimal() +
   labs(fill = "% global", title = "Proporción global por clasificación y región")
 jaccard_heatmap.p
-
-#Grid panel
-library(cowplot)
-
-plot_grid(local.p, global.p)
-
-#Count by region and phenotype
-candidates_exclusive_modules.c <- candidates_exclusive_modules %>%
-  group_by(Region, Classification) %>%
-  summarise(n = n(), .groups = "drop")
 
 #Filter exclusive modules --- ---
 candidates_exclusive_modules <- jaccards.tb %>%
@@ -436,7 +433,7 @@ module_gene_counts <- tibble(
   N_genes = sapply(unlist(module_list, recursive = FALSE), length)
 )
 
-# Agregar el número de genes a exclusive_modules
+#Add number of genes per module
 exclusive_modules <- exclusive_modules %>%
   left_join(module_gene_counts, by = "Module") %>%
   arrange(Region, Phenotype, desc(N_genes))
@@ -522,32 +519,29 @@ exclusive.p
 #   )
 # exclusive_v2.p
 
-# EL "desacuerdo fenotípico"
-#¿Existen módulos AD-exclusivos que estén presentes (conservados) en varias regiones?
-# ¿Hay módulos Control-exclusivos que también aparezcan en múltiples regiones?
-
-#Tomas los módulos AD-exclusivos de cada región, por ejemplo:
+#Phenotypic disagreement
+#Are there AD-exclusive modules that are present (conserved) in several regions?
+#Are there Control-exclusive modules that also appear in multiple regions?
+#You take the AD-exclusive modules from each region, for example:
 #
 # Mayo_CRB_AD_, Mayo_PCC_AD_3, etc.
 # 
-# Y luego comparas cada par entre regiones usando, por ejemplo, índice de Jaccard entre sus genes.
+# And then you compare each pair between regions using, for example, the Jaccard index between their genes.
 # 
-# Si dos módulos de distintas regiones tienen un índice de Jaccard ≥ umbral (ej. 0.8), los consideras “conservados entre regiones”.
+# If two modules from different regions have a Jaccard index ≥ threshold (e.g. 0.8), you consider them ‘conserved between regions’.
 
-#Meta: Identificar módulos exclusivos (AD o Control) que aparecen en más de una región con alta similitud (Jaccard_Index ≥ 0.8).
+#Goal: Identify exclusive modules (AD or Control) that appear in more than one region with high similarity (Jaccard_Index ≥ 0.8).
 
-# Jaccard entre módulos exclusivos de diferentes regiones (dentro de cada fenotipo)
+#Jaccard between exclusive modules in different regions (within each phenotype)
 
 find_conserved_modules <- function(exclusive_df, modules_list, threshold = 0.8) {
   conserved_list <- list()
-  
-  # Filtrar por fenotipo
+  #Filter per phenotype
   phenos <- unique(exclusive_df$Phenotype)
-  
   for (pheno in phenos) {
     sub_df <- exclusive_df %>% filter(Phenotype == pheno)
     
-    # Agrupar por módulos de diferentes regiones
+    #Group per modules in diff regions
     for (i in 1:(nrow(sub_df) - 1)) {
       for (j in (i + 1):nrow(sub_df)) {
         mod1 <- sub_df$Module[i]
@@ -556,7 +550,7 @@ find_conserved_modules <- function(exclusive_df, modules_list, threshold = 0.8) 
         reg1 <- sub_df$Region[i]
         reg2 <- sub_df$Region[j]
         
-        # Saltar si son de la misma región
+        #Skip if it is the same region
         if (reg1 == reg2) next
         
         genes1 <- modules[[mod1]]
@@ -582,22 +576,20 @@ find_conserved_modules <- function(exclusive_df, modules_list, threshold = 0.8) 
   bind_rows(conserved_list)
 }
 
-# Ejecutar
+#Run
 conserved_modules_across_regions <- find_conserved_modules(
   exclusive_modules,
   modules,
   threshold = upp_thres
 )
 
-conserved_modules_across_regions %>% 
+conserved_modules_across_regions
 
-# Guardar
+#Save
 fwrite(conserved_modules_across_regions,
        file = file.path(output_dir, "conserved_exclusive_modules_across_regions.csv"))
 
 #Generar un grafo de módulos conservados entre regiones
-
-library(igraph)
 
 # Crear objeto grafo
 g <- graph_from_data_frame(
@@ -637,4 +629,5 @@ plot(
   layout = layout_with_fr(g),  # o layout_with_kk
   main = "Grafo de módulos exclusivos conservados entre regiones"
 )
+
 

@@ -14,7 +14,8 @@ pacman::p_load(
   optparse,
   ggplot2,
   igraph, 
-  cowplot
+  cowplot, 
+  pheatmap
 )
 
 #Parser
@@ -90,7 +91,7 @@ modules <- modules[sapply(modules, length) >= min_genes]
 meta$region <- gsub("^(Mayo_|ROSMAP_)", "", meta$region)
 regions <- unique(meta$region)
 
-# Recalcular `module_list` filtrando por tamaño mínimo
+#Recalculate `module_list` by filtering for minimum size
 module_list <- lapply(module_list, function(mods) {
   mods[sapply(mods, length) >= min_genes]
 })
@@ -107,7 +108,7 @@ module_counts <- tibble(
   ungroup()
 
 #Thresholds
-upp_thres <- 0.8
+upp_thres <- 0.7
 low_thres <- 0.25
 
 #Loop to calculate Jaccards per region
@@ -174,7 +175,7 @@ jaccard_hist.p <- ggplot(jaccards.tb, aes(x = Jaccard_Index)) +
   )
 
 jaccard_hist.p
-# 
+
 # jaccard_region.p <- ggplot(jaccards.tb, aes(x = Jaccard_Index)) +
 #   geom_histogram(binwidth = 0.005, fill = "navyblue", color = "black", alpha = 0.7) +
 #   geom_density(aes(y = ..count.. * 0.005), color = "orange", size = 1) +
@@ -343,7 +344,7 @@ global.p
 #Grid plot
 plot_grid(local.p, global.p)
 
-
+#Jaccard heatmap
 jaccard_heatmap.p <- ggplot(summary_all, aes(x = Region, y = Classification, fill = global_proportion)) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "C") +
@@ -519,6 +520,76 @@ exclusive.p
 #   )
 # exclusive_v2.p
 
+#NETWORKS INTRA REGION
+
+jaccards_similar <- jaccards.tb %>%
+  filter(Classification == "Similar") %>%
+  transmute(
+    Region,
+    from = Module_AD,
+    to = Module_Control,
+    weight = Jaccard_Index
+  )
+
+networks_by_region <- edge_list %>%
+  split(.$Region) %>%
+  map(~ igraph::graph_from_data_frame(d = .x[, c("from", "to", "weight")], directed = FALSE))
+
+# Lista para guardar redes
+networks_by_region <- list()
+
+# Crear redes por región (sin map)
+for (reg in unique(jaccards_similar$Region)) {
+  edges_region <- jaccards_similar[jaccards_similar$Region == reg, ]
+  
+  if (nrow(edges_region) > 0) {
+    g <- graph_from_data_frame(d = edges_region[, c("from", "to", "weight")], directed = FALSE)
+    networks_by_region[[as.character(reg)]] <- g
+    
+    # Guardar como .graphml
+    write_graph(g, file = file.path(output_dir, paste0("network_", reg, ".graphml")), format = "graphml")
+    V(g)$color <- ifelse(grepl("_AD_", V(g)$name), "tomato", "steelblue")
+    
+    # Graficar red
+    plot(
+      g,
+      edge.width = E(g)$weight * 5,
+      vertex.label.cex = 0.6,
+      vertex.size = 6,
+      main = paste("Módulos similares -", reg),
+      layout = layout_with_fr(g)
+    )
+  } else {
+    message("No hay módulos similares en la región: ", reg)
+  }
+}
+
+#OTHER COMPARISONS
+
+# Crear matriz de Jaccard para región
+for (reg in unique(jaccards_similar$Region)) {
+  df <- jaccards_similar %>% filter(Region == reg)
+  
+  mod_AD <- unique(df$from)
+  mod_CTRL <- unique(df$to)
+  
+  mat <- matrix(0, nrow = length(mod_AD), ncol = length(mod_CTRL),
+                dimnames = list(mod_AD, mod_CTRL))
+  
+  for (i in seq_len(nrow(df))) {
+    mat[df$from[i], df$to[i]] <- df$weight[i]
+  }
+  
+  # pheatmap::pheatmap(
+  #   mat,
+  #   cluster_rows = FALSE,
+  #   cluster_cols = FALSE,
+  #   main = paste("Módulos Similares -", reg),
+  #   color = colorRampPalette(c("white", "blue"))(100))
+}
+
+################################## PART 2 ################################## 
+
 #Phenotypic disagreement
 #Are there AD-exclusive modules that are present (conserved) in several regions?
 #Are there Control-exclusive modules that also appear in multiple regions?
@@ -534,7 +605,7 @@ exclusive.p
 
 #Jaccard between exclusive modules in different regions (within each phenotype)
 
-find_conserved_modules <- function(exclusive_df, modules_list, threshold = 0.8) {
+find_conserved_modules <- function(exclusive_df, modules_list, threshold = 0.001) {
   conserved_list <- list()
   #Filter per phenotype
   phenos <- unique(exclusive_df$Phenotype)

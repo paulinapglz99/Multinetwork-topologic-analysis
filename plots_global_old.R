@@ -28,15 +28,24 @@ globals <- vroom::vroom("~/Desktop/local_work/results_topos/networks_summary.csv
 globals$Region <-sub("^(Mayo_|ROSMAP_)", "", sub("_counts_.*", "", globals$network))
 globals$Phenotype <- sub("^.*_counts_([^_]+).*", "\\1", globals$network)
 globals$Phenotype <- factor(globals$Phenotype, levels = c("control", "AD"))
-names(globals$clustering_global)
+globals <- globals %>%  select(where(~ !all(is.na(.x))))
+#globals <-globals %>% filter(!perc_random_50)
+# Fix column name for global clustering
 colnames(globals)[11] <- "global_clustering"
+colnames(globals)[13] <-"degree_mean"
+colnames(globals)[14] <- "degree_median"
+colnames(globals)[15] <- "degree_sd"
 
-metric_cols <- c("n_nodes", "n_edges", "n_components", 
-                 "n_communities", "degree_mean","avg_path_length",
-                 "global_clustering", "mean_clustering_local",
-                 "diameter", "global_density", 
-                 "size_giant_component","frac_giant_component",
-                 "Q_modularity", "perc_targeted_50")
+colnames(globals)
+
+# ------------------ #
+#   Define metrics   #
+# ------------------ #
+metric_cols <- colnames(globals)[2:20]
+# generar nombres bonitos para etiquetas
+metric_labels <- metric_cols %>%
+  gsub("_", " ", .) %>% 
+  tools::toTitleCase()
 
 #Get means per phenotype and region
 means <- globals %>%
@@ -194,43 +203,22 @@ make_metric_plot <- function(df, metric, title, ylab) {
 
 #Specifications to plot metrics
 plot_specs <- data.frame(
-  var = c(
-    "n_nodes", "n_edges", 
-    "n_components", "n_communities",
-    "deg_mean", "avg_path_len",
-    "global_clustering", "clustering_local_mean",
-    "diameter", "global_density",
-    "size_giant_component", "frac_giant_component",
-    "Q_modularity", "perc_targeted_50"
-  ),
-  # title = c(
-  #   "Vertices", "Edges", "Components",
-  #   "Communities", "Mean degree of nodes", "Average path length",
-  #   "Global clustering", "Local clustering coefficient", "Diameter", "Global density",
-  #   "Size of the giant component", "Fraction of giant component", "Q modularity", "Percolation threshold"),
-  ylab = c(
-    "Vertices", "Edges", "Components",
-    "Communities", "Mean degree", "Average path length",
-    "Global clustering", "Local clustering", "Diameter", "Density",
-    "Size", "Fraction", "Q", "Percolation threshold"
-  ),
-  color = c(
-    "red4", "cornflowerblue",
-    "mediumpurple", "slateblue", "maroon", "navyblue", "olivedrab",
-    "lightpink4", "red4", "tomato4", "lightsalmon", "firebrick", "seagreen", "yellowgreen"
-  ),
+  var = metric_cols,
+  ylab = metric_labels,
   stringsAsFactors = FALSE
 )
 
 #Plot all metrics
-plots <- map2(plot_specs$var, seq_along(plot_specs$var), function(varname, idx) {
+plots <- map2(plot_specs$var,
+              seq_along(plot_specs$var),
+              function(varname, idx) {
   make_metric_plot(globals, varname, plot_specs$title[idx], plot_specs$ylab[idx])
 })
 
 x <- ggarrange(plotlist = plots, ncol = 2, nrow = 7)
 x
 
-ggsave("global_metrics.pdf", 
+ggsave("1-global_metrics.pdf", 
        x, 
        width = 12, 
        height = 15, 
@@ -273,7 +261,7 @@ x <- ggarrange(plotlist = plots, ncol = 2, nrow = 7, align = "hv")
 x
 
 #in pdf
-ggsave("global_metrics_lollipop.pdf", 
+ggsave("2-global_metrics_lollipop.pdf", 
        x, 
        width = 12, 
        height = 15, 

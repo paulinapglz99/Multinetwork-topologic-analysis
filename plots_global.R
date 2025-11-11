@@ -138,8 +138,7 @@ pc1 <- round(var_exp[1], 1)
 pc2 <- round(var_exp[2], 1)
 
 #Plot PCA
-pca <- ggplot(pca_df, aes(x = PC1, y = PC2,
-                          color = Phenotype, label = Region)) +
+pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) +
   geom_point(size = 4) +
   geom_text_repel(size = 3.5, show.legend = FALSE) +
   scale_color_manual(values = c("control" = "cornflowerblue", "AD" = "red4")) +
@@ -220,7 +219,7 @@ grand <- cowplot::plot_grid(
 )
 
 grand
-ggsave("grand_global_metrics.jpeg", grand, width = 17, height = 18, units = "in", dpi = 300)
+ggsave("grand_global_metrics-pres.jpeg", grand, width = 25, height = 19, units = "in", dpi = 300)
 
 #Statistical comparisons
 stats <- metric_cols %>%

@@ -75,6 +75,9 @@ jaccard_index <- function(a, b) {
 #Read and Prepare Files
 files <- list.files(input_dir, pattern = pattern, full.names = TRUE)
 meta <- do.call(rbind, lapply(files, extract_info))
+#Extract unique names from regions
+meta$region <- gsub("^(Mayo_|ROSMAP_)", "", meta$region)
+regions <- unique(meta$region)
 module_list <- lapply(files, load_modules)
 #names(module_list) <- basename(files)
 
@@ -86,10 +89,6 @@ modules <- modules[sapply(modules, length) >= min_genes]
 #FIRST: COMPARE NETWORKS IN EACH REGION PER PHENOTYPE TO FIND AD-exclusive and ctrl-exclusive modules in each region
 
 #Comparison between phenotypes by region
-
-#Extract unique names from regions
-meta$region <- gsub("^(Mayo_|ROSMAP_)", "", meta$region)
-regions <- unique(meta$region)
 
 #Recalculate `module_list` by filtering for minimum size
 module_list <- lapply(module_list, function(mods) {

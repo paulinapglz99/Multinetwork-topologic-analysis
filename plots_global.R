@@ -238,7 +238,7 @@ grand <- cowplot::plot_grid(
   labels = c("A", "B"),
   label_size = 14,
   ncol = 2,
-  rel_widths = c(1.5, 1)  # el lollipop más ancho
+  rel_widths = c(1.5, 1)
 )
 
 #Vis

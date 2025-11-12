@@ -27,7 +27,7 @@ node_data <- map_df(files, function(file) {
 
 #PREGUNTA 1:¿Existen genes que son hubs exclusivos en AD y que se conservan a lo largo de diferentes regiones cerebrales?
 
-#Define hubs: top 5% degree
+#Define hubs: top 10% degree and pagerank
 node_data <- node_data %>%
   group_by(file) %>%
   mutate(

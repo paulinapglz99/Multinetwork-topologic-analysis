@@ -1,10 +1,6 @@
 #!/usr/bin/env Rscript
-# ============================================================
-# Script: plots_global.R
-# Purpose: Generate topological network metric plots and heatmaps
-# Author: Alejandra Paulina Pérez González
-# Repository: https://github.com/paulinapglz99/Multinetwork-topologic-analysis
-# ============================================================
+#plots_global.R
+#Generate topological network metric plots and heatmaps
 
 #Load packages
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman", repos = "https://cloud.r-project.org")
@@ -12,7 +8,7 @@ if (!requireNamespace("optparse", quietly = TRUE)) install.packages("optparse", 
 
 pacman::p_load(
   igraph, data.table, ggplot2, tidyverse,
-  optparse, tools, purrr, ggpubr, broom, pheatmap, vroom, ggrepel
+  optparse, tools, purrr, ggpubr, broom, pheatmap, vroom, ggrepel, cowplot, ggrepel
 )
 
 #Get data
@@ -100,7 +96,11 @@ heatmap_global<- grid::grid.grabExpr({
 )
 })
 
-ggsave("heatmap_global.jpeg",
+#Vis
+heatmap_global
+
+#Save plot
+ggsave("heatmap_global-a.jpeg",
        plot = heatmap_global,
        device = "jpeg",
        width = 15, 
@@ -108,6 +108,7 @@ ggsave("heatmap_global.jpeg",
        units = "in",
        dpi = 300
        )
+
 ############PLOT CORRELATIONS##############
 #See if certain metrics are co-varying
 
@@ -116,7 +117,6 @@ cor_mat <- cor(globals %>% select(all_of(metric_cols)), use = "pairwise.complete
 pheatmap(cor_mat,
          color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
          main = "Correlation between Network Metrics")
-
 
 ############PCA of regions by metrics################
 
@@ -138,7 +138,12 @@ pc1 <- round(var_exp[1], 1)
 pc2 <- round(var_exp[2], 1)
 
 #Plot PCA
-pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) +
+safe_ellipse <- function(...) {
+  tryCatch(stat_ellipse(...), error = function(e) NULL)
+}
+pca <- ggplot(pca_df, aes(x = PC1, y = PC2, 
+                          color = Phenotype,
+                          label = Region)) +
   geom_point(size = 4) +
   geom_text_repel(size = 3.5, show.legend = FALSE) +
   scale_color_manual(values = c("control" = "cornflowerblue", "AD" = "red4")) +
@@ -147,12 +152,25 @@ pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) 
     x = paste0("PC1 (", pc1, "% var)"),
     y = paste0("PC2 (", pc2, "% var)")
   ) +
-  theme_pubclean() +
+  theme_cowplot() +
+  #stat_ellipse(aes(group = Region), level = 0.95, geom = "polygon", alpha = 0.2) +
   theme(
     legend.position = "top",
     plot.title = element_text(hjust = 0.5)
   )
+
+#Vis
 pca
+
+#Save plot
+ggsave("pca-globals.jpeg",
+       plot = pca,
+       device = "jpeg",
+       width = 5, 
+       height = 5,
+       units = "in",
+       dpi = 300
+)
 
 ############PLOT ALL METRICS ##############
 
@@ -161,18 +179,20 @@ make_metric_plot <- function(df, metric, title, ylab) {
   ggplot(df, aes(
     x = as.factor(Region),
     y = .data[[metric]],
-    color = Phenotype
+    color = Phenotype,
+    group = Phenotype 
   )) +
-    geom_segment(aes(
-      xend = as.factor(Region),
-      y = 0, yend = .data[[metric]]
-    ), size = 0.8) +
-    geom_point(size = 3) +
-    facet_wrap(~Phenotype, scales = "free_y", ncol = 2) +
+    # geom_segment(aes(
+    #   xend = as.factor(Region),
+    #   y = 0, yend = .data[[metric]]
+    # ), size = 0.8) +
+    geom_line(linewidth = 0.8, alpha = 0.8) +
+    geom_point(size = 2.5) +
+    #facet_wrap(~Phenotype, scales = "free_y", ncol = 2) +
     labs(title = " ", x = "", y = ylab) +
     scale_color_manual(values = c("control" = "cornflowerblue", "AD" = "red4")) +
     scale_y_continuous(limits = c(0, max(df[[metric]]))) +
-    theme_pubclean() +
+    theme_light() +
     theme(
       legend.position = "none",
       panel.spacing = unit(0.2, "lines"),
@@ -193,11 +213,14 @@ plots <- map2(plot_specs$var, seq_along(plot_specs$var), function(varname, idx) 
   make_metric_plot(globals, varname, plot_specs$ylab[idx], plot_specs$ylab[idx])
 })
 
+#Grid plots
 x <-cowplot::plot_grid(plotlist = plots, ncol = 2)
+#Vis
 x
 
-ggsave("1-global_metrics_lollipop.pdf", x, width = 12, height = 15, units = "in", dpi = 300)
-ggsave("1-global_metrics_lollipop.jpeg", x, width = 12, height = 18, units = "in", dpi = 300)
+#Save plots
+ggsave("2-global_metrics_lollipop.pdf", x, width = 12, height = 15, units = "in", dpi = 300)
+ggsave("3-global_metrics_lollipop.jpeg", x, width = 12, height = 18, units = "in", dpi = 300)
 
 #Final grand plot
 right_panel <- cowplot::plot_grid(
@@ -205,35 +228,27 @@ right_panel <- cowplot::plot_grid(
   pca,
   ncol = 1,
   labels = c(" ", "C"),
-  rel_heights = c(1.2, 1)  # ajusta proporciones verticales
+  rel_heights = c(1.2, 1)
 )
 right_panel
 
 grand <- cowplot::plot_grid(
-  x,              # izquierda (A)
-  right_panel,    # derecha (B + C)
-  labels = c("A", "B"),  # solo marca A y B en los grandes bloques
+  x,              
+  right_panel,
+  labels = c("A", "B"),
   label_size = 14,
   ncol = 2,
   rel_widths = c(1.5, 1)  # el lollipop más ancho
 )
 
+#Vis
 grand
-ggsave("grand_global_metrics-pres.jpeg", grand, width = 25, height = 19, units = "in", dpi = 300)
 
-#Statistical comparisons
-stats <- metric_cols %>%
-  map_df(function(metric) {
-    df <- globals %>%
-      select(Region, Phenotype, all_of(metric)) %>%
-      filter(!is.na(.data[[metric]]))
-    test <- t.test(formula(paste(metric, "~ Phenotype")), data = df)
-    tidy(test) %>% mutate(metric = metric)
-  })
+#Save plot
+ggsave("1-grand_global_metrics-pres.jpeg", grand, 
+       width = 18, 
+       height = 17,
+       units = "in",
+       dpi = 300)
 
-stats <- stats %>%
-  select(metric, estimate1, estimate2, statistic, p.value) %>%
-  arrange(p.value)
-
-#Save stats results
-vroom::vroom_write(file = "network_metric_stats.csv", x = stats)
+#END

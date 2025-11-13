@@ -1,5 +1,8 @@
 #mi pregunta es, existe algun gen hub que sea un hub diferenciador, es decir, solo presente como hub en la enfermedad de Alzheimer
 #y que este se conserve a lo largo de las redes en las diferentes regiones anatomicas?
+if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("mygene")
+library(mygene)
 
 #Get packages
 pacman::p_load("tidyverse",
@@ -8,10 +11,21 @@ pacman::p_load("tidyverse",
                "biomaRt",
                "cowplot", 
                "vroom", 
-               "pheatmap")
+               "pheatmap", "org.Hs.eg.db",
+               "AnnotationDbi")
+
+#Functions
+
 
 #Get files
-input_dir <- "~/Desktop/local_work/results_topos"
+input_dir <- "/STORAGE/csbig/networks_final/fomo_networks/results_topos_infomap/"
+# Define function to convert from ENSMBL to SYMBOL
+convert_ens_to_symbol <- function(ensembl_ids) {
+  getBM(attributes = c("ensembl_gene_id", "external_gene_name", "chromosome_name"),
+        filters = "ensembl_gene_id",
+        values = ensembl_ids,
+        mart = mart)
+}
 files <- list.files(input_dir, pattern = "_nodes_summary.csv$", full.names = TRUE)
 #Get data
 node_data <- map_df(files, function(file) {
@@ -38,63 +52,89 @@ node_data <- node_data %>%
   ) %>%
   ungroup()
 
+symbols <- AnnotationDbi::mapIds(
+  org.Hs.eg.db,
+  keys = node_data$node,
+  keytype = "ENSEMBL",
+  column = "SYMBOL",
+  multiVals = "first"
+)
+
+symbols.df <- tibble(
+  node   = names(symbols),
+  symbol = unname(symbols)
+)
+
+node_data <- node_data %>%
+  left_join(symbols.df, by = "node") %>%
+  mutate(symbol = coalesce(symbol, node))
+
 #Build table gene × region × phenotype
 hubs_degree.s <- node_data %>%
   filter(hub_degree & hub_pagerank) %>%
-  group_by(node, Region, Phenotype) %>%
+  #filter(hub_pagerank) %>%
+  group_by(symbol, Region, Phenotype) %>%
   summarise(n = n(), .groups = "drop") %>%
   mutate(hub = TRUE)
 
 #Pivot gene × Region × Phenotype
 hubs_degree_pivot <- hubs_degree.s %>%
-  pivot_wider(names_from = Phenotype, values_from = hub, values_fill = FALSE)
+  pivot_wider(names_from = Phenotype,
+              values_from = hub, 
+              values_fill = FALSE)
 
 #Filter genes that are hubs in any AD net but not hubs in any control
 exclusive_AD_hubs_degree <- hubs_degree_pivot %>%
   filter(AD == TRUE & Control == FALSE) %>%
-  group_by(node) %>%
+  group_by(symbol) %>%
   summarise(n_regions_AD = n(), regions = paste(Region, collapse = ",")) %>%
   arrange(desc(n_regions_AD))
 
 exclusive_AD_hubs_degree_filter <- exclusive_AD_hubs_degree %>% 
-  filter(n_regions_AD >=3)
+  filter(n_regions_AD >=2)
 
 hubs_degree_pivot_filter <- hubs_degree_pivot %>%
-  filter(node %in% exclusive_AD_hubs_degree_filter$node)
+  filter(symbol %in% exclusive_AD_hubs_degree_filter$symbol)
 
 #Heatmap gene × region
 heatmap_matrix <- hubs_degree_pivot_filter %>%
   filter(AD == TRUE & Control == FALSE) %>%
-  dplyr::select(node, Region) %>%
+  dplyr::select(symbol, Region) %>%
   mutate(value = 1) %>%
-  pivot_wider(names_from = Region, values_from = value, values_fill = 0) %>%
-  column_to_rownames("node") %>%
+  pivot_wider(names_from = Region, 
+              values_from = value, 
+              values_fill = 0) %>%
+  column_to_rownames("symbol") %>%
   as.matrix()
 
 #Plot heatmap
 pheatmap(heatmap_matrix,
-         cluster_rows = TRUE,
+         cluster_rows = FALSE,
          cluster_cols = TRUE,
-         main = "AD-Exclusive Hub Genes (Any Metric)",
-         fontsize_row = 7,
-         color = colorRampPalette(c("gray90", "firebrick3"))(100))
+         legend = FALSE,
+         main = NA,
+         fontsize_row = 10,
+         color = colorRampPalette(c("gray90", "royalblue4"))(100), 
+         file = "heatmap_hubs.jpeg")
 
 #PREGUNTA 2: ¿Qué funciones moleculares están asociadas a estos genes?
 
 #Enrichment of genes
-wide_hubs <-  hubs_degree_pivot_filter$node
+wide_hubs <-unique(hubs_degree_pivot_filter$symbol)
 
 w_enrich <-enrichGO(gene = wide_hubs,
          OrgDb = "org.Hs.eg.db", 
-         keyType = 'ENSEMBL',
+         keyType = 'SYMBOL',
          readable = TRUE,
          #universe = universe, 
          ont = "MF",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
          pvalueCutoff = 0.05, 
          qvalueCutoff = 0.10)
 
-#dotplot(w_enrich_edox, showCategory=30)
+as.data.frame(w_enrich)
 
+#dotplot(w_enrich_edox, showCategory=30)
+  
 cnetplot <- cnetplot(w_enrich_edox, node_label_size = NULL)
 cnetplot
 
@@ -102,7 +142,7 @@ cnetplot
 
 exclusive_AD_hubs_degree_filter %>%
   top_n(20, n_regions_AD) %>%
-  ggplot(aes(x = reorder(node, n_regions_AD), y = n_regions_AD)) +
+  ggplot(aes(x = reorder(symbol, n_regions_AD), y = n_regions_AD)) +
   geom_bar(stat = "identity", fill = "firebrick") +
   coord_flip() +
   labs(title = "Top AD-Exclusive Hubs by Region Recurrence",

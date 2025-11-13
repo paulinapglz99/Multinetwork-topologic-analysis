@@ -12,7 +12,7 @@ pacman::p_load(
 )
 
 #Get data
-globals <- vroom::vroom("~/Desktop/local_work/results_topos/networks_summary.csv")
+globals <- vroom::vroom("/STORAGE/csbig/networks_final/fomo_networks/results_topos_louvain/networks_summary.csv")
 
 #Parse region and phenotype names from network IDs
 globals$Region <- sub("^(Mayo_|ROSMAP_)", "", sub("_counts_.*", "", globals$network))
@@ -30,11 +30,9 @@ colnames(globals)
 
 #Define metrics
 #metric_cols <- colnames(globals)[2:20]
-metric_cols <-  c("n_nodes"    ,            "n_edges"       ,         "avg_path_len"        ,   "diameter"          ,     "global_density"        ,
-"size_giant_component"  , "frac_giant_component",   "n_components"       ,    "clustering_local_mean" , "global_clustering"     ,
-"assortativity"  ,        "degree_mean"       ,     "degree_median"   ,           "kcore_max" ,            
- "Q_modularity"    ,       "perc_targeted_50"    ,   "n_communities"     ,     "largest_community_size"
- )
+metric_cols <-  c("n_nodes",  "n_communities", "n_components", "degree_median", "degree_mean", 
+"global_density", "avg_path_len","diameter", "clustering_local_mean" , "global_clustering",
+"assortativity",  "kcore_max", "Q_modularity","perc_targeted_50", "largest_community_size")
 
 #Compute means per group
 means <- globals %>%
@@ -91,7 +89,7 @@ heatmap_global<- grid::grid.grabExpr({
   cluster_cols = FALSE,
   scale = "none",
   border_color = "white",
-  fontsize = 10,
+  fontsize = 20,
   main = " "
 )
 })

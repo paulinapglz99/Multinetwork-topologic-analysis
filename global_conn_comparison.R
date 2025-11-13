@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Compute Jaccard similarity between edge sets of networks
+# Compute Jaccard similarity between networks (based on edge sets)
 
 if (!requireNamespace("pacman", quietly = TRUE))
   install.packages("pacman", repos = "https://cloud.r-project.org")
@@ -21,13 +21,11 @@ option_list <- list(
 
 opt <- parse_args(OptionParser(option_list = option_list))
 dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
-
-opt$input_dir <- "/STORAGE/csbig/networks_final/networks_filtered/"
-opt$out_dir <- "/STORAGE/csbig/networks_final/networks_filtered/results_global_comparisons"
+opt$out_dir <- "/STORAGE/csbig/networks_final/fomo_networks/results_conn_comparisons"
+opt$input_dir <- "/STORAGE/csbig/networks_final/fomo_networks/"
 opt$pattern <- "\\.tsv$"
 
-#read_network function
-
+#Read_network function
 read_network <- function(path, type = opt$type) {
   message("DEBUG - received type: ", paste0(type, collapse = ","))
   type <- match.arg(type)
@@ -70,56 +68,48 @@ read_network <- function(path, type = opt$type) {
   return(g)
 }
 
-# -------------------------------
-# Read and process networks
-# -------------------------------
+#Jaccard function
+jaccard_edges <- function(g1, g2) {
+  inter <- igraph::intersection(g1, g2, byname = TRUE)
+  uni <- igraph::union(g1, g2, byname = TRUE)
+  return(length(E(inter)) / length(E(uni)))
+}
+
+#Load networks
 files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)
 if (length(files) < 2) stop("At least 2 network files are required.")
 
 networks <- lapply(files, read_network)
 names(networks) <- basename(files)
 
-# -------------------------------
-# Extract sets of unique edges
-# -------------------------------
-get_edge_set <- function(g) {
-  edgelist <- igraph::as_edgelist(g)
-  apply(edgelist, 1, function(e) paste(sort(e), collapse = "|"))
-}
-
-edge_sets <- lapply(networks, get_edge_set)
-
-# -------------------------------
-# Compute Jaccard similarity matrix
-# -------------------------------
-n <- length(edge_sets)
+#Compute Jaccard similarity matrix
+n <- length(networks)
 jaccard_matrix <- matrix(NA, nrow = n, ncol = n)
-rownames(jaccard_matrix) <- colnames(jaccard_matrix) <- names(edge_sets)
+rownames(jaccard_matrix) <- colnames(jaccard_matrix) <- names(networks)
 
 for (i in 1:n) {
   for (j in i:n) {
-    a <- edge_sets[[i]]
-    b <- edge_sets[[j]]
-    jaccard <- if (length(union(a, b)) > 0) {
-      length(intersect(a, b)) / length(union(a, b))
-    } else {
-      NA
-    }
-    jaccard_matrix[i, j] <- jaccard_matrix[j, i] <- jaccard
+    sim <- jaccard_edges(networks[[i]], networks[[j]])
+    jaccard_matrix[i, j] <- jaccard_matrix[j, i] <- sim
   }
 }
 
-# -------------------------------
-# Save matrix and heatmap
-# -------------------------------
+#Save results
 csv_out <- file.path(opt$out_dir, "jaccard_edge_matrix.csv")
 pdf_out <- file.path(opt$out_dir, "jaccard_edge_heatmap.pdf")
-
 fwrite(as.data.table(jaccard_matrix, keep.rownames = TRUE), csv_out)
-pheatmap(jaccard_matrix, cluster_rows = TRUE, cluster_cols = TRUE,
-         display_numbers = TRUE, main = "Edge Jaccard Similarity",
-         filename = pdf_out)
 
-message("✅ Jaccard matrix saved to: ", csv_out)
-message("✅ Heatmap saved to: ", pdf_out)
+#Plot
+pheatmap(jaccard_matrix,
+         cluster_rows = TRUE, 
+         cluster_cols = FALSE,
+         display_numbers = TRUE,
+         main = "Edge Jaccard Similarity",
+         filename = pdf_out, 
+         color = hcl.colors(50, "BluYl")
+         )
 
+message("Jaccard matrix saved to: ", csv_out)
+message("Heatmap saved to: ", pdf_out)
+
+#END

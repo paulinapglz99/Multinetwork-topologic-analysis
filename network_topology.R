@@ -201,15 +201,15 @@ analyze_one <- function(path, percol_steps, per_node, out_dir, type = "auto") {
   pr_norm <- (pr- min(pr)) / (max(pr) - min(pr))
   pr_top <- sort(pr, decreasing = TRUE)[1:min(5, length(pr))]  #Adjusting the degree distribution to estimate the gamma exponent
   
-  #Detecting communities with Infomap (error handling)
-  comm_infomap <- tryCatch(
-    cluster_infomap(g),
+  #Detecting communities
+  comm_louvain <- tryCatch(
+    cluster_louvain(g),
     error = function(e) make_clusters(g, membership = rep(1, n))
   )
-  Q_mod <- modularity(comm_infomap)
+  Q_mod <- modularity(comm_louvain)
   
   #Calculate largest community
-  comm_sizes <- sizes(comm_infomap)
+  comm_sizes <- sizes(comm_louvain)
   largest_comm_size <- max(comm_sizes)
   largest_comm_id <- which.max(comm_sizes)
   
@@ -251,7 +251,7 @@ analyze_one <- function(path, percol_steps, per_node, out_dir, type = "auto") {
       pagerank = pr,
       pagerank_norm = pr_norm,
       kcore = kcore,
-      membership_infomap = membership(comm_infomap)
+      membership = membership(comm_louvain)
     )
     nm_base <- tools::file_path_sans_ext(nm)
     node_table_path <- file.path(opt$out_dir, paste0(nm_base, "_nodes_summary.csv"))
@@ -269,7 +269,16 @@ analyze_one <- function(path, percol_steps, per_node, out_dir, type = "auto") {
 
 #Parallelize over files
 plan(multisession, workers = opt$workers)
+
 results <- future_lapply(files, FUN = analyze_one, future.seed = TRUE)
+
+# results <- future_lapply(files, FUN = function(f) {
+#   res <- analyze_one(f, percol_steps = opt$percol_steps, per_node = opt$per_node, out_dir = opt$out_dir)
+#   if (is.null(res)) message("⚠️ Skipped file due to error: ", f)
+#   return(res)
+# }, future.seed = TRUE)
+
+#which(sapply(results, function(x) is.null(x) || is.null(x$summary)))
 
 #Consolidate summaries
 summaries <- rbindlist(lapply(results, function(x) if (!is.null(x)) x$summary else NULL), fill = TRUE)
@@ -277,8 +286,21 @@ summaries$network <- sub("^network_", "", tools::file_path_sans_ext(summaries$fi
 fwrite(summaries, file.path(opt$out_dir, "networks_summary.csv"))
 
 #Save metadata about per-node outputs
+# node_paths <- rbindlist(lapply(results, function(x) {
+#   if (!is.null(x) && !is.na(x$node_table)) data.table(file = x$summary$file, node_table = x$node_table, ) else NULL
+# }), fill = TRUE)
 node_paths <- rbindlist(lapply(results, function(x) {
-  if (!is.null(x) && !is.na(x$node_table)) data.table(file = x$summary$file, node_table = x$node_table, ) else NULL
+  tryCatch({
+    if (!is.null(x) && !is.na(x$node_table)) {
+      data.table(file = x$summary$file, node_table = x$node_table)
+    } else {
+      NULL
+    }
+  }, error = function(e) {
+    message("Error en result: ", conditionMessage(e))
+    message("Contenido de x:\n", paste(capture.output(str(x)), collapse = "\n"))
+    return(NULL)
+  })
 }), fill = TRUE)
 if (nrow(node_paths) > 0) fwrite(node_paths, file.path(opt$out_dir, "networks_nodes_index.csv"))
 
@@ -376,7 +398,7 @@ if (opt$make_html) {
   "  ),\n",
   "  title = c(\n",
   "    'Number of vertices (genes)', 'Number of edges', 'Number of components',\n",
-  "    'Number of communities (INFOMAP)', 'Mean degree of nodes', 'Average path length',\n",
+  "    'Number of communities', 'Mean degree of nodes', 'Average path length',\n",
   "    'Global clustering', 'Local clustering coefficient', 'Diameter', 'Global density',\n",
   "    'Size of the giant component', 'Fraction of giant component', 'Q modularity', 'Percolation threshold'\n",
   "  ),\n",

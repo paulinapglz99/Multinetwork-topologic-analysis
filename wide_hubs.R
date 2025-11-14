@@ -11,15 +11,85 @@ pacman::p_load("tidyverse",
                "biomaRt",
                "cowplot", 
                "vroom", 
-               "pheatmap", "org.Hs.eg.db",
-               "AnnotationDbi")
+               "pheatmap", 
+               "org.Hs.eg.db",
+               "AnnotationDbi",
+               "optparse")
 
 #Functions
+#Read_network function
+read_network <- function(path, type = opt$type) {
+  message("DEBUG - received type: ", paste0(type, collapse = ","))
+  type <- match.arg(type)
+  ext <- tolower(tools::file_ext(path))
+  
+  if (ext == "graphml") {
+    g <- igraph::read_graph(path, format = "graphml")
+    
+  } else if (ext %in% c("csv", "tsv", "txt")) {
+    sep <- ifelse(ext == "tsv", "\t", ",")
+    df <- data.table::fread(path, sep = sep, header = TRUE, data.table = FALSE)
+    
+    if (type == "edgelist") {
+      g <- if (ncol(df) >= 3) igraph::graph_from_data_frame(df[, 1:3], directed = FALSE)
+      else igraph::graph_from_data_frame(df[, 1:2], directed = FALSE)
+      
+    } else if (type == "adjacency") {
+      mat <- as.matrix(df)
+      storage.mode(mat) <- "numeric"
+      g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
+      
+    } else if (type == "auto") {
+      looks_like_adj <- all(sapply(df[,-1, drop=FALSE], is.numeric))
+      if (looks_like_adj) {
+        rownames(df) <- make.unique(as.character(df[, 1]))
+        mat <- as.matrix(df[, -1, drop=FALSE])
+        storage.mode(mat) <- "numeric"
+        g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected", weighted = TRUE)
+      } else {
+        g <- if (ncol(df) >= 3) igraph::graph_from_data_frame(df[, 1:3], directed = FALSE)
+        else igraph::graph_from_data_frame(df[, 1:2], directed = FALSE)
+      }
+    }
+    
+  } else {
+    stop("Unsupported file format: ", ext)
+  }
+  
+  g <- igraph::simplify(igraph::as_undirected(g, mode = "collapse"), remove.multiple = TRUE, remove.loops = TRUE)
+  return(g)
+}
 
+#Extract metadata
+extract_info <- function(filename) {
+  base <- basename(filename)
+  if (grepl("_counts_", base)) {
+    region <- sub("_counts_.*", "", base)
+    phenotype <- ifelse(grepl("_AD_", base), "AD", "Control")
+    return(data.frame(filename = filename, region = region, phenotype = phenotype))
+  } else {
+    return(NULL)
+  }
+}
 
 #Get files
 input_dir <- "/STORAGE/csbig/networks_final/fomo_networks/results_topos_infomap/"
-# Define function to convert from ENSMBL to SYMBOL
+
+#Argument parsing
+option_list <- list(
+  make_option(c("-i", "--input_dir"), type = "character", help = "Directory with network files", metavar = "path"),
+  make_option(c("-d", "--out_dir"), type = "character", default = "jaccard_output", help = "Output directory [default: %default]", metavar = "path"),
+  make_option(c("-p", "--pattern"), type = "character", default = "\\.tsv$", help = "File name pattern to match [default: %default]", metavar = "regex"),
+  make_option(c("-t", "--type"), type = "character", default = "auto", help = "Network file type: edgelist, adjacency, auto [default: %default]", metavar = "type")
+)
+
+opt <- parse_args(OptionParser(option_list = option_list))
+dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
+opt$out_dir <- "/STORAGE/csbig/networks_final/fomo_networks/results_conn_comparisons"
+opt$input_dir <- "/STORAGE/csbig/networks_final/fomo_networks/"
+opt$pattern <- "\\.tsv$"
+
+#Define function to convert from ENSMBL to SYMBOL
 convert_ens_to_symbol <- function(ensembl_ids) {
   getBM(attributes = c("ensembl_gene_id", "external_gene_name", "chromosome_name"),
         filters = "ensembl_gene_id",
@@ -91,7 +161,8 @@ exclusive_AD_hubs_degree <- hubs_degree_pivot %>%
   arrange(desc(n_regions_AD))
 
 exclusive_AD_hubs_degree_filter <- exclusive_AD_hubs_degree %>% 
-  filter(n_regions_AD >=2)
+  filter(n_regions_AD >=2) %>%
+  arrange(desc(n_regions_AD))
 
 hubs_degree_pivot_filter <- hubs_degree_pivot %>%
   filter(symbol %in% exclusive_AD_hubs_degree_filter$symbol)
@@ -107,6 +178,9 @@ heatmap_matrix <- hubs_degree_pivot_filter %>%
   column_to_rownames("symbol") %>%
   as.matrix()
 
+# Reordenar filas del heatmap según gene_order
+heatmap_matrix <- heatmap_matrix[exclusive_AD_hubs_degree_filter$symbol, ]
+
 #Plot heatmap
 pheatmap(heatmap_matrix,
          cluster_rows = FALSE,
@@ -119,104 +193,79 @@ pheatmap(heatmap_matrix,
 
 #PREGUNTA 2: ¿Qué funciones moleculares están asociadas a estos genes?
 
-#Enrichment of genes
-wide_hubs <-unique(hubs_degree_pivot_filter$symbol)
-
-w_enrich <-enrichGO(gene = wide_hubs,
-         OrgDb = "org.Hs.eg.db", 
-         keyType = 'SYMBOL',
-         readable = TRUE,
-         #universe = universe, 
-         ont = "MF",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
-         pvalueCutoff = 0.05, 
-         qvalueCutoff = 0.10)
-
-as.data.frame(w_enrich)
-
-#dotplot(w_enrich_edox, showCategory=30)
-  
-cnetplot <- cnetplot(w_enrich_edox, node_label_size = NULL)
-cnetplot
+# #Enrichment of genes
+# wide_hubs <-unique(hubs_degree_pivot_filter$symbol)
+# 
+# w_enrich <-enrichGO(gene = wide_hubs,
+#          OrgDb = "org.Hs.eg.db", 
+#          keyType = 'SYMBOL',
+#          readable = TRUE,
+#          #universe = universe, 
+#          ont = "MF",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
+#          pvalueCutoff = 0.05, 
+#          qvalueCutoff = 0.10)
+# 
+# as.data.frame(w_enrich)
+# 
+# #dotplot(w_enrich_edox, showCategory=30)
+#   
+# cnetplot <- cnetplot(w_enrich_edox, node_label_size = NULL)
+# cnetplot
 
 #PREGUNTA 3: ¿Cuáles genes son los hubs más persistentes en AD?
 
-exclusive_AD_hubs_degree_filter %>%
-  top_n(20, n_regions_AD) %>%
-  ggplot(aes(x = reorder(symbol, n_regions_AD), y = n_regions_AD)) +
+# Asegura que los genes estén ordenados igual que en el heatmap
+exclusive_AD_hubs_degree_filter$symbol <- factor(
+  exclusive_AD_hubs_degree_filter$symbol, 
+  levels = rev(exclusive_AD_hubs_degree_filter$symbol)
+)
+
+persistent <- exclusive_AD_hubs_degree_filter %>%
+  #top_n(20, n_regions_AD) %>%
+  ggplot(aes(x = symbol, y = n_regions_AD)) +
   geom_bar(stat = "identity", fill = "firebrick") +
+  geom_text(aes(label = regions), 
+            hjust = 1.2, 
+            size = 4,
+            color="white" 
+              ) +  # Mueve etiqueta a la derecha
   coord_flip() +
   labs(title = "Top AD-Exclusive Hubs by Region Recurrence",
-       x = "Gene", y = "Number of AD Regions") +
+       x = " ", y = "Number of Regions") +
   theme_minimal()
+
+ggsave("persistent_hubs.jpeg", 
+       persistent)
 
 #PREGUNTA 4: ¿Estos genes están correlacionados entre regiones?
 #Ver si los hubs se repiten de forma coordinada entre regiones
+# Calcular la matriz de correlación entre regiones
 
-# Jaccard similarities between AD hub sets per region
-library(reshape2)
-hub_sets <- hubs_degree_pivot_filter %>%
-  filter(AD == TRUE) %>%
-  group_by(Region) %>%
-  summarise(genes = list(unique(node))) %>%
-  deframe()
+# Lista de archivos de redes AD
+ad_net_files <- list.files(opt$input_dir, pattern = "_AD_.*\\.tsv$", full.names = TRUE)
 
-# Compute Jaccard Index
-jaccard_index <- function(a, b) length(intersect(a, b)) / length(union(a, b))
+# Extraer metadatos de cada archivo
+meta <- map_df(ad_net_files, extract_info)
+meta$region <- gsub("^(Mayo_|ROSMAP_)", "", meta$region)
+meta$Network <- paste0(meta$region, "_", meta$phenotype)
 
-region_names <- names(hub_sets)
-jac_mat <- matrix(0, nrow = length(region_names), ncol = length(region_names),
-                  dimnames = list(region_names, region_names))
+# Leer redes
+ad_networks <- map(ad_net_files, ~ read_network(.x, type = "auto"))
+names(ad_networks) <- meta$region
 
-for (i in region_names) {
-  for (j in region_names) {
-    jac_mat[i, j] <- jaccard_index(hub_sets[[i]], hub_sets[[j]])
-  }
-}
+# Genes persistentes
+wide_hub_genes <- exclusive_AD_hubs_degree_filter$symbol
 
-pheatmap(jac_mat, main = "Jaccard Similarity of Hub Genes Across AD Regions",
-         color = colorRampPalette(c("white", "darkred"))(100))
+# Filtrar redes por genes persistentes
+ad_networks_persistent <- map(ad_networks, function(g) {
+  igraph::induced_subgraph(g, vids = igraph::V(g)[name %in% wide_hub_genes])
+})
+
 
 #PREGUNTA 5: ¿Dónde aparecen estos genes en la red?
 #¿Estos genes hubs se agrupan en módulos específicos? ¿Están dispersos?
 
-wide_hub_genes <- exclusive_AD_hubs_degree_filter$node
+wide_hub_genes <- exclusive_AD_hubs_degree_filter$symbol
 
-# Solo redes AD
-wide_nodes_AD <- node_data %>%
-  filter(Phenotype == "AD") %>%
-  filter(node %in% wide_hub_genes)
-
-modules_distribution <- wide_nodes_AD %>%
-  group_by(network, membership_infomap) %>%
-  summarise(n_genes = n(),
-            genes = paste(node, collapse = ","),
-            .groups = "drop")
-
-# Asegúrate de que tiene la columna 'membership_infomap'
-stopifnot("membership_infomap" %in% colnames(nodes_AD))
-
-module_summary <- modules_distribution %>%
-  group_by(network) %>%
-  summarise(
-    total_hubs = sum(n_genes),
-    n_modules_with_hubs = n(),
-    max_module_size = max(n_genes),
-    top_module_prop = max(n_genes) / sum(n_genes)
-  )
-
-genes_modules <- nodes_AD %>%
-  dplyr::select(node, network, membership_infomap)
-
-genes_modules_matrix <- genes_modules %>%
-  mutate(value = 1) %>%
-  pivot_wider(names_from = network, values_from = value, values_fill = 0) %>%
-  column_to_rownames("node") %>%
-  as.matrix()
-
-pheatmap(genes_modules_matrix,
-         main = "Presencia de genes hub AD-exclusivos en redes",
-         color = colorRampPalette(c("white", "red3"))(100))
-
-#Grand panel
 
 

@@ -209,6 +209,7 @@ dendro <- ggdendrogram(hc_dist, rotate = TRUE, theme_dendro = FALSE) +
   theme_cowplot() +
   labs(title = "", x = "", y = "")
 
+#Vis
 dendro
 
 #Hetamap of matrix distance 
@@ -233,8 +234,8 @@ heatmap_dist <- ggplot(dist_long, aes(Network1, Network2, fill = Distance)) +
   scale_fill_viridis_c(
     guide = guide_colorbar(
       position = "top",
-      barheight = unit(4, "pt"),    # altura muy delgada
-      barwidth  = unit(120, "pt"),  # ancho compacto
+      barheight = unit(4, "pt"),    
+      barwidth  = unit(120, "pt"),  
       title.position = "top"
     )
   ) +
@@ -310,6 +311,7 @@ final_plot <- heatmap_dist + pca_dist.p + dendro +
   plot_layout(design = layout,
               heights = c(2, 1))
 
+#Vis
 final_plot
 
 ############PLOT ALL METRICS ##############

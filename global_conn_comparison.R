@@ -12,15 +12,15 @@ pacman::p_load(
 #Argument parsing
 option_list <- list(
   make_option(c("-i", "--input_dir"), type = "character", help = "Directory with network files", metavar = "path"),
-  make_option(c("-d", "--out_dir"), type = "character", default = "jaccard_output", help = "Output directory [default: %default]", metavar = "path"),
+  make_option(c("-d", "--out_dir"), type = "cha8racter", default = "jaccard_output", help = "Output directory [default: %default]", metavar = "path"),
   make_option(c("-p", "--pattern"), type = "character", default = "\\.tsv$", help = "File name pattern to match [default: %default]", metavar = "regex"),
   make_option(c("-t", "--type"), type = "character", default = "auto", help = "Network file type: edgelist, adjacency, auto [default: %default]", metavar = "type")
 )
 
 opt <- parse_args(OptionParser(option_list = option_list))
 dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
-opt$out_dir <- "/STORAGE/csbig/networks_final/fomo_networks/results_conn_comparisons"
-opt$input_dir <- "/STORAGE/csbig/networks_final/fomo_networks/"
+opt$out_dir <- "~/Desktop/fomo_networks/results_conn_comparisons"
+opt$input_dir <- "~/Desktop/fomo_networks/"
 opt$pattern <- "\\.tsv$"
 
 #Read_network function
@@ -186,6 +186,9 @@ get_edge_set <- function(g) {
   apply(edgelist, 1, function(e) paste(sort(e), collapse = "|"))
 }
 
+opt$input_dir <- "~/Desktop/local_work/fomo_networks/"
+opt$out_dir  <- "~/Desktop/local_work/fomo_networks/plots"
+
 #Get files
 files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)
 if (length(files) < 2) stop("Se necesitan al menos 2 archivos.")
@@ -196,7 +199,7 @@ names(networks) <- basename(files)
 #Get edge sets
 edge_sets <- lapply(networks, get_edge_set)
 
-# Calcular matriz de Jaccard
+#Calculate Jaccard matrix
 
 n <- length(edge_sets)
 jaccard_matrix <- matrix(NA, nrow = n, ncol = n)
@@ -215,9 +218,7 @@ for (i in 1:n) {
   }
 }
 
-# -------------------------------
-# Guardar matriz y heatmap
-# -------------------------------
+#Save matrix and heatmap
 csv_out <- file.path(opt$out_dir, "jaccard_edge_matrix.csv")
 pdf_out <- file.path(opt$out_dir, "jaccard_edge_heatmap.pdf")
 

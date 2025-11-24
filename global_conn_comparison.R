@@ -26,6 +26,7 @@ opt$pattern <- "\\.tsv$"
 #Read_network function
 read_network <- function(path, type = opt$type) {
   message("DEBUG - received type: ", paste0(type, collapse = ","))
+
   type <- match.arg(type)
   ext <- tolower(tools::file_ext(path))
   
@@ -179,4 +180,51 @@ ggsave(filename = file.path(opt$out_dir, "miniheat.jpeg"),
        width = 5, 
        height = 7)
 
-#END
+#Get sets of edges function
+get_edge_set <- function(g) {
+  edgelist <- igraph::as_edgelist(g)
+  apply(edgelist, 1, function(e) paste(sort(e), collapse = "|"))
+}
+
+#Get files
+files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)
+if (length(files) < 2) stop("Se necesitan al menos 2 archivos.")
+
+networks <- lapply(files, read_network)
+names(networks) <- basename(files)
+
+#Get edge sets
+edge_sets <- lapply(networks, get_edge_set)
+
+# Calcular matriz de Jaccard
+
+n <- length(edge_sets)
+jaccard_matrix <- matrix(NA, nrow = n, ncol = n)
+rownames(jaccard_matrix) <- colnames(jaccard_matrix) <- names(edge_sets)
+
+for (i in 1:n) {
+  for (j in i:n) {
+    a <- edge_sets[[i]]
+    b <- edge_sets[[j]]
+    jaccard <- if (length(union(a, b)) > 0) {
+      length(intersect(a, b)) / length(union(a, b))
+    } else {
+      NA
+    }
+    jaccard_matrix[i, j] <- jaccard_matrix[j, i] <- jaccard
+  }
+}
+
+# -------------------------------
+# Guardar matriz y heatmap
+# -------------------------------
+csv_out <- file.path(opt$out_dir, "jaccard_edge_matrix.csv")
+pdf_out <- file.path(opt$out_dir, "jaccard_edge_heatmap.pdf")
+
+fwrite(as.data.table(jaccard_matrix, keep.rownames = TRUE), csv_out)
+pheatmap(jaccard_matrix, cluster_rows = TRUE, cluster_cols = TRUE,
+         display_numbers = TRUE, main = "Jaccard de enlaces",
+         filename = pdf_out)
+
+message("✅ Matriz guardada en: ", csv_out)
+message("✅ Heatmap guardado en: ", pdf_out)

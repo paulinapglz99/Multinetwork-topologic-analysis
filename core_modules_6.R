@@ -30,8 +30,8 @@ option_list <- list(
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 #Inputs
-opt$input_dir <- "~/Desktop/local_work/results_topos/"
-opt$output_dir <- "~/Desktop/local_work/results_topos/results_core_modules"
+opt$input_dir <- "~/Desktop/local_work/fomo_networks/results_topos_louvain/"
+opt$output_dir <- "~/Desktop/local_work/fomo_networks/results_core_modules"
 
 input_dir <- opt$input_dir
 output_dir <- opt$output_dir
@@ -56,7 +56,7 @@ extract_info <- function(filename) {
 #Load modules with unique names
 load_modules <- function(file) {
   df <- fread(file)
-  if (!all(c("node", "membership_infomap") %in% names(df))) {
+  if (!all(c("node", "membership") %in% names(df))) {
     stop("File ", file, " must contain columns 'node' and 'membership_infomap'")
   }
   region <- sub("_counts_.*", "", basename(file))
@@ -232,10 +232,10 @@ jaccard.p <- plot_grid(jaccard_hist.p,
 jaccard.p
 
 #Save histograms
-ggsave(filename = file.path(output_dir, "jaccard_histogram.pdf"), 
-       plot = jaccard_hist.p, 
-       width = 10, 
-       height = 7)
+# ggsave(filename = file.path(output_dir, "jaccard_histogram.pdf"), 
+#        plot = jaccard_hist.p, 
+#        width = 10, 
+#        height = 7)
 
 #A module is considered unique to a phenotype (e.g., AD) if it has no similar module in the opposite phenotype in the same region.
 #This means:
@@ -295,7 +295,7 @@ summary_all <- classified_all %>%
   mutate(across(c(local_proportion, global_proportion), round, 1))
 
 #Save result
-fwrite(summary_all, file = file.path(output_dir, "modules_classification_summary.csv"))
+#fwrite(summary_all, file = file.path(output_dir, "modules_classification_summary.csv"))
 
 #Visualize local proportion
 
@@ -394,9 +394,9 @@ barplot.p <- ggplot(candidates_exclusive_modules.c, aes(x = Region, y = n, fill 
 barplot.p
 
 #Save barplot
-ggsave(filename = file.path(output_dir, "similar_dissimilar_barplot.pdf"), 
-       plot = barplot.p, 
-       width = 7, height = 10)
+# ggsave(filename = file.path(output_dir, "similar_dissimilar_barplot.pdf"), 
+#        plot = barplot.p, 
+#        width = 7, height = 10)
 
 message("First Jaccard comparison completed and table saved!")
 

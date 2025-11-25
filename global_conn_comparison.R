@@ -1,26 +1,23 @@
 #!/usr/bin/env Rscript
 # Compute Jaccard similarity between networks (based on edge sets)
 
-if (!requireNamespace("pacman", quietly = TRUE))
-  install.packages("pacman", repos = "https://cloud.r-project.org")
+if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman", repos = "https://cloud.r-project.org")
 
 pacman::p_load(
   "data.table", "optparse", "tools",
-  "igraph", "pheatmap", "tidyverse"
-)
+  "igraph", "pheatmap", "tidyverse")
 
 #Argument parsing
 option_list <- list(
   make_option(c("-i", "--input_dir"), type = "character", help = "Directory with network files", metavar = "path"),
-  make_option(c("-d", "--out_dir"), type = "cha8racter", default = "jaccard_output", help = "Output directory [default: %default]", metavar = "path"),
+  make_option(c("-d", "--out_dir"), type = "character", default = "jaccard_output", help = "Output directory [default: %default]", metavar = "path"),
   make_option(c("-p", "--pattern"), type = "character", default = "\\.tsv$", help = "File name pattern to match [default: %default]", metavar = "regex"),
-  make_option(c("-t", "--type"), type = "character", default = "auto", help = "Network file type: edgelist, adjacency, auto [default: %default]", metavar = "type")
-)
+  make_option(c("-t", "--type"), type = "character", default = "auto", help = "Network file type: edgelist, adjacency, auto [default: %default]", metavar = "type"))
 
 opt <- parse_args(OptionParser(option_list = option_list))
 dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
-opt$out_dir <- "~/Desktop/fomo_networks/results_conn_comparisons"
-opt$input_dir <- "~/Desktop/fomo_networks/"
+#opt$out_dir <- "~/Desktop/fomo_networks/results_conn_comparisons"
+opt$input_dir <- "~/Desktop/local_work/fomo_networks/"
 opt$pattern <- "\\.tsv$"
 
 #Read_network function
@@ -94,9 +91,9 @@ meta <- do.call(rbind, lapply(files, extract_info))
 #Extract unique names from regions
 meta$region <- gsub("^(Mayo_|ROSMAP_)", "", meta$region)
 meta$Network <- paste0(meta$region, "_", meta$phenotype)
-
 networks <- lapply(files, read_network)
 names(networks) <- meta$Network 
+regions <- unique(meta$region)
 
 #Compute Jaccard similarity matrix
 n <- length(networks)
@@ -111,28 +108,16 @@ for (i in 1:n) {
 }
 
 #Save results
-csv_out <- file.path(opt$out_dir, "jaccard_edge_matrix.csv")
-pdf_out <- file.path(opt$out_dir, "jaccard_edge_heatmap.jpeg")
-fwrite(as.data.table(jaccard_matrix, keep.rownames = TRUE), csv_out)
+#csv_out <- file.path(opt$out_dir, "jaccard_edge_matrix.csv")
+#fwrite(as.data.table(jaccard_matrix, keep.rownames = TRUE), csv_out)
 
-#Plot
-# pheatmap(jaccard_matrix,
-#          cluster_rows = TRUE, 
-#          cluster_cols = FALSE,
-#          display_numbers = TRUE,
-#          #main = "Edge Jaccard Similarity",
-#          filename = pdf_out
-#          )
-
-regions <- unique(meta$region)
-
-# Convertir matriz a formato largo tidy
-df_long <- as.data.frame(jaccard_matrix) %>% 
+#Make matrix long format
+jaccard_matrix.l <- as.data.frame(jaccard_matrix) %>% 
   rownames_to_column("network1") %>% 
   pivot_longer(-network1, names_to = "network2", values_to = "jaccard")
 
-# Solo comparaciones *dentro de la misma región*
-df_region <- df_long %>% 
+#Only comparisons within the same region
+region <- jaccard_matrix.l %>% 
   # unir info de cada red
   left_join(meta,  by = c("network1" = "Network"))  %>% 
   dplyr::select(-filename) %>% 
@@ -150,7 +135,7 @@ df_region <- df_long %>%
   ) %>% 
   distinct() 
 
-df_heat <- df_region  %>% 
+heatmap.df <- region  %>% 
   select(region, jaccard) %>% 
   distinct() %>% 
   arrange(jaccard) %>% 
@@ -158,21 +143,28 @@ df_heat <- df_region  %>%
 
 #Plot dumbbell
 
-miniheat <- ggplot(df_heat, aes(x = "AD_vs_Control", y = region,
-                                fill = jaccard)) +
+miniheat <- ggplot(heatmap.df, aes(x = "AD vs Control", 
+                                   y = region,
+                                fill = jaccard
+                                )) +
   geom_tile(color = "white") +
   geom_text(aes(label = round(jaccard, 3)), color = "black", size = 4) +
   scale_fill_gradient(low = "cornflowerblue", high = "firebrick") +
   labs(
     x = "",
     y = "",
-    fill = " "
-  ) +
+    fill = " ") +
+  #coord_flip() +
   theme_minimal(base_size = 14) +
   theme(
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
-    panel.grid = element_blank())
+    panel.grid = element_blank(), 
+    legend.position="none"
+)
+
+#Vis
+miniheat
 
 #Save histograms
 ggsave(filename = file.path(opt$out_dir, "miniheat.jpeg"), 

@@ -291,28 +291,57 @@ pca_dist.p <-ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Reg
     axis.text    = element_text(size = 9)
   )
 
-#Grid plots
-layout <- "
-AB
-CC
-"
-#Adjust plots just for aesthetic
-heatmap_dist <- heatmap_dist + 
-  theme(aspect.ratio = 1)   # cuadrado
+##### FINAL GRID ####
 
-pca_dist.p <- pca_dist.p +
-  theme(aspect.ratio = 0.7) # más horizontal
+library(cowplot)
 
-dendro <- dendro +
-  theme(aspect.ratio = 0.2) # slim horizontal
+# Panel A + B lado a lado (heatmap + dendrograma)
+top_panel <- plot_grid(
+  heatmap_dist,
+  pca_dist.p,
+  labels = c("A", "B"),
+  label_size = 14,
+  ncol = 2,
+  rel_widths = c(2, 1)   # A más grande que B
+)
 
+# Panel C (miniheatmap)
+middle_panel <- plot_grid(
+  dendro,
+  labels = "C",
+  label_size = 14,
+  ncol = 1
+)
 
-final_plot <- heatmap_dist + pca_dist.p + dendro + 
-  plot_layout(design = layout,
-              heights = c(2, 1))
+# Panel D (PCA)
+bottom_panel <- plot_grid(
+  miniheat,
+  labels = "D",
+  label_size = 14,
+  ncol = 1
+)
 
-#Vis
+# Figura final: (A|B) / C / D
+final_plot <- plot_grid(
+  top_panel,
+  middle_panel,
+  bottom_panel,
+  ncol = 1,
+  rel_heights = c(1.8, 1,   1.6)   # Ajusta como quieras
+)
+
+# Mostrar
 final_plot
+
+# Guardar
+ggsave(
+  "final_global_figure.jpeg",
+  plot = final_plot,
+  width = 14,
+  height = 16,
+  dpi = 300
+)
+
 
 ############PLOT ALL METRICS ##############
 

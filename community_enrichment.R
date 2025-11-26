@@ -81,15 +81,15 @@ process_network <- function(row) {
     return(paste0(out_file, " (skipped, empty input)"))
   }
   
-  if (!"membership_infomap" %in% colnames(summary_df)) {
-    stop('"node_table" does not have the membership_infomap column"')
+  if (!"membership" %in% colnames(summary_df)) {
+    stop('"node_table" does not have the membership column"')
   }
   
   #Read network universe
   network_universe <- unique(summary_df$node)
   
   #Split the nodes per community to enrich
-  nodes_by_comm <- split(summary_df$node, summary_df$membership_infomap)
+  nodes_by_comm <- split(summary_df$node, summary_df$membership)
   
   #Enrich each comm
   enriched_list <- lapply(names(nodes_by_comm), function(community_id) {

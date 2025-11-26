@@ -141,7 +141,7 @@ heatmap.df <- region  %>%
   arrange(jaccard) %>% 
   mutate(region = factor(region, levels = region))
 
-#Plot dumbbell
+#Plot miniheatmap
 
 miniheat <- ggplot(heatmap.df, aes(x = "AD vs Control", 
                                    y = region,

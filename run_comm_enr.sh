@@ -1,5 +1,4 @@
-Rscript ~/Multinetwork-topologic-analysis/community_enrichment.R \
--i ~/Multinetwork-topologic-analysis/results_graphml/networks_nodes_index.csv \
--u ~/Multinetwork-topologic-analysis/test_data/gene_universe.txt \
--o ~/Multinetwork-topologic-analysis/test_data/results_comm \
+Rscript /home/tiamat/Desktop/local_work/Multinetwork-topologic-analysis/community_enrichment.R \
+-i /home/tiamat/Desktop/local_work/fomo_networks/results_topos_louvain/networks_nodes_index_local.csv \
+-o /home/tiamat/Desktop/local_work/fomo_networks/results_topos_louvain/results_comm \
 -w 2

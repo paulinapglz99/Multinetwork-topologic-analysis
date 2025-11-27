@@ -300,6 +300,9 @@ classified_CTRL <- jaccards.tb %>%
 #Bind tables to get a classification of all modules
 classified_all <- bind_rows(classified_AD, classified_CTRL)
 
+#Save table
+vroom::vroom_write(classified_all, file = file.path(output_dir, "module_classification.csv"))
+
 #Make a summary per classification and region
 summary_all <- classified_all %>%
   group_by(Region, Phenotype, Classification) %>%

@@ -1,8 +1,8 @@
-#mi pregunta es, existe algun gen hub que sea un hub diferenciador, es decir, solo presente como hub en la enfermedad de Alzheimer
-#y que este se conserve a lo largo de las redes en las diferentes regiones anatomicas?
+#My question is, is there any gene hub that is a differentiating hub,
+#that is, only present as a hub in Alzheimer's disease
+#and that is conserved throughout the networks in different anatomical regions?
+
 if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-BiocManager::install("mygene")
-library(mygene)
 
 #Get packages
 pacman::p_load("tidyverse",
@@ -73,7 +73,8 @@ extract_info <- function(filename) {
 }
 
 #Get files
-input_dir <- "/STORAGE/csbig/networks_final/fomo_networks/results_topos_infomap/"
+input_dir <- "~/Desktop/local_work/fomo_networks/results_topos_louvain/"
+#"/STORAGE/csbig/networks_final/fomo_networks/results_topos_infomap/"
 
 #Argument parsing
 option_list <- list(
@@ -84,10 +85,12 @@ option_list <- list(
 )
 
 opt <- parse_args(OptionParser(option_list = option_list))
+opt$out_dir <- "~/Desktop/local_work/fomo_networks/results_wide_hubs"
 dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
-opt$out_dir <- "/STORAGE/csbig/networks_final/fomo_networks/results_conn_comparisons"
-opt$input_dir <- "/STORAGE/csbig/networks_final/fomo_networks/"
+opt$input_dir <- "~/Desktop/local_work/fomo_networks/fomo_networks/"
 opt$pattern <- "\\.tsv$"
+
+setwd(opt$out_dir)
 
 #Define function to convert from ENSMBL to SYMBOL
 convert_ens_to_symbol <- function(ensembl_ids) {
@@ -193,24 +196,24 @@ pheatmap(heatmap_matrix,
 
 #PREGUNTA 2: ¿Qué funciones moleculares están asociadas a estos genes?
 
-# #Enrichment of genes
-# wide_hubs <-unique(hubs_degree_pivot_filter$symbol)
-# 
-# w_enrich <-enrichGO(gene = wide_hubs,
-#          OrgDb = "org.Hs.eg.db", 
-#          keyType = 'SYMBOL',
-#          readable = TRUE,
-#          #universe = universe, 
-#          ont = "MF",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
-#          pvalueCutoff = 0.05, 
-#          qvalueCutoff = 0.10)
-# 
-# as.data.frame(w_enrich)
-# 
-# #dotplot(w_enrich_edox, showCategory=30)
-#   
-# cnetplot <- cnetplot(w_enrich_edox, node_label_size = NULL)
-# cnetplot
+#Enrichment of genes
+wide_hubs <-unique(hubs_degree_pivot_filter$symbol)
+
+w_enrich <-enrichGO(gene = wide_hubs,
+         OrgDb = "org.Hs.eg.db",
+         keyType = 'SYMBOL',
+         readable = TRUE,
+         #universe = universe,
+         ont = "MF",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
+         pvalueCutoff = 0.05,
+         qvalueCutoff = 0.10)
+
+as.data.frame(w_enrich)
+
+#dotplot(w_enrich_edox, showCategory=30)
+
+cnetplot <- cnetplot(w_enrich_edox, node_label_size = NULL)
+cnetplot
 
 #PREGUNTA 3: ¿Cuáles genes son los hubs más persistentes en AD?
 

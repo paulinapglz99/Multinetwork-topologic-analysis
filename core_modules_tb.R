@@ -15,7 +15,8 @@ pacman::p_load(
   "ggplot2",
   "igraph", 
   "cowplot", 
-  "pheatmap"
+  "pheatmap",
+ "clusterProfiler"
 )
 
 #Parser
@@ -60,11 +61,12 @@ extract_info <- function(filename) {
 
 #Load modules with unique names
 load_modules <- function(file) {
-  df <- fread(file)
+  df <- vroom::vroom(file)
   if (!all(c("node", "membership") %in% names(df))) {
     stop("File ", file, " must contain columns 'node' and 'membership'")
   }
   region <- sub("_counts_.*", "", basename(file))
+  region <- gsub("^(Mayo_|ROSMAP_)", "", region)
   phenotype <- ifelse(grepl("_AD_", file), "AD", "Control")
   df$unique_module_id <- paste(region, phenotype, df$membership, sep = "_")
   split(df$node, df$unique_module_id)
@@ -185,7 +187,7 @@ nmi_results <- purrr::map_dfr(
 )
 
 #Save results 
-vroom::vroom_write(nmi_results, file = file.path(output_dir, "NMI_AD_vs_Control_by_region.csv"))
+#vroom::vroom_write(nmi_results, file = file.path(output_dir, "NMI_AD_vs_Control_by_region.csv"))
 
 print(nmi_results)
 
@@ -259,7 +261,7 @@ jaccards.tb$Region <- factor(jaccards.tb$Region, levels = ordered_regions)
 print(table(jaccards.tb$Classification))
 
 #Save results <- RESULT #1
-vroom::vroom_write(jaccards.tb, file = file.path(output_dir, "jaccards_all_regions.csv"))
+#vroom::vroom_write(jaccards.tb, file = file.path(output_dir, "jaccards_all_regions.csv"))
 message("First Jaccard comparison completed and table saved!")
 
 #Reorder modules to have a summary table 
@@ -277,7 +279,7 @@ classified_AD <- jaccards.tb %>%
       TRUE ~ "AD_exclusive"
     )
   ) %>%
-  rename(Module = Module_AD) %>%
+  dplyr::rename(Module = Module_AD) %>%
   mutate(Phenotype = "AD")
 
 classified_CTRL <- jaccards.tb %>%
@@ -294,35 +296,35 @@ classified_CTRL <- jaccards.tb %>%
       TRUE ~ "Control_exclusive"
     )
   ) %>%
-  rename(Module = Module_Control) %>%
+   dplyr::rename(Module = Module_Control) %>%
   mutate(Phenotype = "Control")
 
 #Bind tables to get a classification of all modules
 classified_all <- bind_rows(classified_AD, classified_CTRL)
 
 #Save table
-vroom::vroom_write(classified_all, file = file.path(output_dir, "module_classification.csv"))
+#vroom::vroom_write(classified_all, file = file.path(output_dir, "module_classification.csv"))
 
 #Make a summary per classification and region
 summary_all <- classified_all %>%
   group_by(Region, Phenotype, Classification) %>%
   summarise(n_modules = n(), .groups = "drop") %>%
   mutate(Network = paste0(Region, "_", Phenotype)) %>% 
-  select(Network, n_modules, Classification) %>%
+  dplyr::select(Network, n_modules, Classification) %>%
   left_join(module_counts, by = "Network") %>%
   mutate(local_proportion = n_modules / N_modules * 100) %>% 
   mutate(global_proportion = n_modules / Total_region_modules * 100) %>%
   mutate(across(c(local_proportion, global_proportion), round, 1))
 
 #Save result
-vroom::vroom_write(summary_all, file = file.path(output_dir, "modules_classification_summary.csv"))
+#vroom::vroom_write(summary_all, file = file.path(output_dir, "modules_classification_summary.csv"))
 
 #Filter exclusive modules --- ---
 candidates_exclusive_modules <- jaccards.tb %>%
   filter(Classification %in% c("Dissimilar", "Similar"))
 
 #Save result
-vroom::vroom_write(candidates_exclusive_modules, file = file.path(output_dir, "candidates_exclusive_modules.csv"))
+#vroom::vroom_write(candidates_exclusive_modules, file = file.path(output_dir, "candidates_exclusive_modules.csv"))
 
 #Count by region and phenotype
 candidates_exclusive_modules.c <- candidates_exclusive_modules %>%
@@ -330,7 +332,7 @@ candidates_exclusive_modules.c <- candidates_exclusive_modules %>%
   summarise(n = n(), .groups = "drop")
 
 #Save result
-vroom::vroom_write(candidates_exclusive_modules.c, file = file.path(output_dir, "n_candidates_exclusive_modules.csv"))
+#vroom::vroom_write(candidates_exclusive_modules.c, file = file.path(output_dir, "n_candidates_exclusive_modules.csv"))
 
 #Extract AD and Control modules by region
 
@@ -341,7 +343,7 @@ exclusive_AD <- jaccards.tb %>%
     .groups = "drop"
   ) %>%
   filter(!has_similar) %>%
-  select(Region, Module_AD) %>%
+  dplyr::select(Region, Module_AD) %>%
   mutate(Phenotype = "AD_exclusive")
 
 exclusive_CTRL <- jaccards.tb %>%
@@ -351,14 +353,19 @@ exclusive_CTRL <- jaccards.tb %>%
     .groups = "drop"
   ) %>%
   filter(!has_similar) %>%
-  select(Region, Module_Control) %>%
+  dplyr::select(Region, Module_Control) %>%
   mutate(Phenotype = "Control_exclusive")
 
 #Bind results
-exclusive_modules <- bind_rows(
-  exclusive_AD %>% rename(Module = Module_AD),
-  exclusive_CTRL %>% rename(Module = Module_Control)
-)
+names(exclusive_AD)[names(exclusive_AD) == "Module_AD"] <- "Module"
+names(exclusive_CTRL)[names(exclusive_CTRL) == "Module_Control"] <- "Module"
+
+# Unir data.frames por filas
+exclusive_modules <- rbind(exclusive_AD, exclusive_CTRL)
+
+
+# Unir data.frames por filas
+exclusive_modules <- rbind(exclusive_AD, exclusive_CTRL)
 
 #Add number of genes per module
 exclusive_modules <- exclusive_modules %>%
@@ -366,14 +373,14 @@ exclusive_modules <- exclusive_modules %>%
   arrange(Region, Phenotype, desc(N_genes))
 
 #Save results
-vroom::vroom_write(exclusive_modules, file = file.path(output_dir, "exclusive_modules_AD_CTRL.csv"))
+#vroom::vroom_write(exclusive_modules, file = file.path(output_dir, "exclusive_modules_AD_CTRL.csv"))
 
 #check
 
 exclusive_summary <- summary_all %>% filter(Classification %in% c("AD_exclusive", "Control_exclusive"))
 
 #Save results
-vroom::vroom_write(exclusive_summary, file = file.path(output_dir, "exclusive_summary.csv"))
+#vroom::vroom_write(exclusive_summary, file = file.path(output_dir, "exclusive_summary.csv"))
 
 ################################## PART 2 ################################## 
 
@@ -443,13 +450,92 @@ conserved_modules_across_regions <- find_conserved_modules(
 conserved_modules_across_regions
 
 #Save
-vroom::vroom_write(conserved_modules_across_regions, file = file.path(output_dir, "conserved_exclusive_modules_across_regions.csv"))
+#vroom::vroom_write(conserved_modules_across_regions, file = file.path(output_dir, "conserved_exclusive_modules_across_regions.csv"))
+
+#What biological functions have the conserved modules?
+
+#what are those modules?
+conserved_modules <- unique(c(
+  conserved_modules_across_regions$Module_1,
+  conserved_modules_across_regions$Module_2
+))
+
+#Filter the enrichments for conserved modules
+enrich_conserved <- enrich_all %>%
+  filter(Module %in% conserved_modules)  %>%
+  filter(p.adjust < 0.05)
+
+#Summary of conserved enriched biological functions
+conserved_bio_summary <- enrich_conserved %>%
+  group_by(Description, Phenotype) %>%
+  summarise(
+    N_modules = n_distinct(Module),
+    Regions = paste(unique(Region), collapse = ", "),
+    Min_pval = min(p.adjust),
+    Example_genes = geneID[which.min(p.adjust)],
+    .groups = "drop"
+  ) %>%
+  arrange(desc(N_modules), Min_pval)
+
+conserved_bio_summary_f <- conserved_bio_summary %>% 
+  filter(N_modules >=2)
+
+enrich_conserved_f <- enrich_conserved %>% 
+  filter(Description %in% conserved_bio_summary_f$Description)
+
+#Concept plot like if we were cavernicolas
+#Get edges
+gene_term_edges <- enrich_conserved_f %>%
+  separate_rows(geneID, sep = "/") %>%
+  dplyr::select(Description, geneID, p.adjust)
+
+#Bipartite graph
+edges <- gene_term_edges %>%
+  distinct(Description, geneID)
+
+nodes <- unique(c(edges$Description, edges$geneID))
+node_type <- ifelse(nodes %in% enrich_conserved_f$Description, "GO term", "Gene")
+
+unique_terms <- enrich_conserved_f %>%
+  group_by(Description) %>%
+  summarise(p.adjust = min(p.adjust))
+graph_df <- data.frame(name = nodes, type = node_type)
+
+#Asign node type
+graph_df <- graph_df %>%
+  mutate(label_type = ifelse(type == "GO term", "Pathway", "Gene")) %>%
+  left_join(unique_terms, by = c("name" = "Description")) %>%
+  mutate(logp = ifelse(label_type == "Pathway", -log10(p.adjust), NA))
+
+#Create graph
+g <- graph_from_data_frame(edges, vertices = graph_df, directed = FALSE)
+
+#Save graph
+igraph::write_graph(g, file = "cnetplot_conserved_modules.graphml", format = "graphml")
 
 ########################## PLOTTING ########################## 
 
 #Number of modules per network
 #1. Hoy many modules has each network?
 
+diffs_modules <- module_counts %>%
+  dplyr::select(Region, Phenotype, N_modules) %>%
+  pivot_wider(
+    names_from = Phenotype,
+    values_from = N_modules
+  ) %>%
+  mutate(diff = AD - Control)
+
+diffs_modules
+
+#Times that
+positives <- sum(diffs_modules$diff > 0)
+
+#Nonsense
+binom.test(positives, n = 5, alternative = "greater")
+wilcox.test(diffs_modules$AD, diffs_modules$Control, paired = TRUE, alternative = "greater")
+
+#Plot module counts
 module_counts.p <- ggplot(module_counts, aes(x = Region, y = N_modules, fill = Phenotype)) +
   geom_bar(stat = "identity", position = "stack", color = "white", linewidth = 0.3) + 
   facet_wrap(~Phenotype) +
@@ -523,6 +609,26 @@ mini_meanjacc_heat <- ggplot(jaccard_summary, aes(x = "", y = Region, fill = mea
 
 mini_meanjacc_heat
 
+
+#Plot
+mini_median_jacc_heat <- ggplot(jaccard_summary, aes(x = "", y = Region, fill = median_jaccard)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(median_jaccard, 3)),  color = "black", size = 4) +
+  scale_fill_gradient(low = "cornflowerblue", high = "firebrick") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Jaccard median",
+       x = "",
+       y = "") +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.grid = element_blank(), 
+    legend.position="none")
+
+mini_median_jacc_heat
+#lol
+
 #Plot panel
 
 miniheats <- cowplot::plot_grid(mini_nmiheat, mini_meanjacc_heat,nrow = 1)
@@ -562,7 +668,7 @@ jaccard_hist.p
 #Plot per region (then grid them)
 jaccard_region.p <- lapply(levels(jaccards.tb$Region), function(reg) {
   ggplot(jaccards.tb %>% filter(Region == reg), aes(x = Jaccard_Index)) +
-    geom_histogram(binwidth = 0.05, fill = "navyblue", color = "black", alpha = 0.7) +
+    geom_histogram(binwidth = 0.04, fill = "navyblue", color = "black", alpha = 0.7) +
     #geom_density(aes(y = ..count.. * 0.005), color = "orange", size = 1) +
     geom_vline(xintercept = low_thres, linetype = "dashed", color = "red", size = 1) +
     geom_vline(xintercept = upp_thres, linetype = "dashed", color = "darkgreen", size = 1) +
@@ -619,7 +725,8 @@ local.p <- ggplot(summary_all, aes(x = Region, y = local_proportion, fill = Clas
     y = "%",
     x = ""
   ) +
-  theme_minimal(base_size = 13)
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none")
 
 #Vis 
 local.p
@@ -629,7 +736,15 @@ local.p
 #Plot proportions per region (global proportion)
 global.p <- ggplot(summary_all, aes(x = Region, y = global_proportion, fill = Classification)) +
   geom_bar(stat = "identity", position = "stack") +
-  scale_fill_manual(values = fill_colors) +
+  scale_fill_manual(
+    values = fill_colors,
+    labels = c(
+      "AD exclusive",
+      "Control exclusive",
+      "Intermediate",
+      "Similar"
+    )
+  ) +
   labs(
     title = "Global",
     x = "",
@@ -637,13 +752,12 @@ global.p <- ggplot(summary_all, aes(x = Region, y = global_proportion, fill = Cl
   ) +
   theme_minimal(base_size = 13) +
   theme(
-
     panel.grid.minor = element_blank()
   )
 global.p 
 
 #Grid plot
-proportions <- plot_grid(local.p, global.p)
+proportions <- plot_grid(local.p, global.p, labels = c("A", "B"))
 proportions
 
 #Save histograms
@@ -681,3 +795,4 @@ barplot.p <- ggplot(candidates_exclusive_modules.c,
 
 barplot.p
 
+#What 

@@ -125,70 +125,78 @@ pheatmap(cor_mat,
          main = "Correlation between Network Metrics")
 
 ############PCA of regions by metrics################
-# 
-# globals_metrics <- globals %>% select(all_of(metric_cols))
-# 
-# #PCA
-# pca_res <- prcomp(globals_metrics, center = TRUE, scale. = TRUE)
-# 
-# #Score df
-# pca_df <- as.data.frame(pca_res$x) %>%
-#   mutate(Region = globals$Region,
-#          Phenotype = globals$Phenotype)
-# 
-# #variance
-# var_exp <- (pca_res$sdev^2 / sum(pca_res$sdev^2)) * 100
-# pc1 <- round(var_exp[1], 1)
-# pc2 <- round(var_exp[2], 1)
-# 
-# #Plot PCA
-# safe_ellipse <- function(...) {
-#   tryCatch(stat_ellipse(...), error = function(e) NULL)
-# }
-# pca <- ggplot(pca_df, aes(x = PC1, y = PC2, 
-#                           color = Phenotype,
-#                           label = Region)) +
-#   geom_point(size = 4) +
-#   geom_text_repel(size = 3.5, show.legend = FALSE) +
-#   scale_color_manual(values = c("control" = "cornflowerblue", "AD" = "red4")) +
-#   labs(
-#     title = " ",
-#     x = paste0("PC1 (", pc1, "% var)"),
-#     y = paste0("PC2 (", pc2, "% var)")
-#   ) +
-#   theme_cowplot() +
-#   #stat_ellipse(aes(group = Region), level = 0.95, geom = "polygon", alpha = 0.2) +
-#   theme(
-#     legend.position = "top",
-#     plot.title = element_text(hjust = 0.5)
-#   )
-# 
-# #Vis
-# pca
-# 
-# #Save plot
-# ggsave("pca-globals-louvain.jpeg",
-#        plot = pca,
-#        device = "jpeg",
-#        width = 5, 
-#        height = 5,
-#        units = "in",
-#        dpi = 300
-# )
+
+globals_metrics <- globals %>% select(all_of(metric_cols))
+
+#PCA
+pca_res <- prcomp(globals_metrics, center = TRUE, scale. = TRUE)
+
+#Score df
+pca_df <- as.data.frame(pca_res$x) %>%
+  mutate(Region = globals$Region,
+         Phenotype = globals$Phenotype)
+
+#variance
+var_exp <- (pca_res$sdev^2 / sum(pca_res$sdev^2)) * 100
+pc1 <- round(var_exp[1], 1)
+pc2 <- round(var_exp[2], 1)
+
+#See contribution scores
+#Get loadings
+loadings_res <- pca_res$rotation
+
+#Contribution scores per component
+contrib_PC1 <- abs(loadings_res[, 1]) / sum(abs(loadings_res[, 1]))
+contrib_PC2 <- abs(loadings_res[, 2]) / sum(abs(loadings_res[, 2]))
+
+#Plot PCA
+safe_ellipse <- function(...) {
+  tryCatch(stat_ellipse(...), error = function(e) NULL)
+}
+pca <- ggplot(pca_df, aes(x = PC1, y = PC2,
+                          color = Phenotype,
+                          label = Region)) +
+  geom_point(size = 4) +
+  geom_text_repel(size = 3.5, show.legend = FALSE) +
+  scale_color_manual(values = c("control" = "cornflowerblue", "AD" = "red4")) +
+  labs(
+    title = " ",
+    x = paste0("PC1 (", pc1, "% var)"),
+    y = paste0("PC2 (", pc2, "% var)")
+  ) +
+  theme_cowplot() +
+  #stat_ellipse(aes(group = Region), level = 0.95, geom = "polygon", alpha = 0.2) +
+  theme(
+    legend.position = "top",
+    plot.title = element_text(hjust = 0.5)
+  )
+
+#Vis
+pca
+
+#Save plot
+ggsave("pca-globals-louvain.jpeg",
+       plot = pca,
+       device = "jpeg",
+       width = 5,
+       height = 5,
+       units = "in",
+       dpi = 300
+)
 
 ############PCA of euclidean distance matrix ################
 
 #Summary of global features
 globals_summary <- globals %>%
   group_by(Region, Phenotype) %>%
-  summarise(across(all_of(metric_cols),
-                   mean, na.rm = TRUE),
-            .groups = "drop") %>%
-  unite("Network", Region, Phenotype, sep = " ")
+  summarise(across(all_of(metric_cols), mean, na.rm = TRUE), .groups = "drop") %>%
+  unite("Network", Region, Phenotype, sep = " ") %>%
+  column_to_rownames("Network") %>%
+  scale()  # Escala z-score por métrica
 
 #Euclidean distance matrix
 dist_matrix <- globals_summary %>%
-  column_to_rownames("Network") %>%
+ # column_to_rownames("Network") %>%
   dist(method = "euclidean") %>%
   as.matrix()
 
@@ -267,6 +275,14 @@ var_exp <- (pca_dist$sdev^2 / sum(pca_dist$sdev^2)) * 100
 pc1 <- round(var_exp[1], 1)
 pc2 <- round(var_exp[2], 1)
 
+#See contribution scores
+#Get loadings
+loadings <- pca_dist$rotation
+
+#Contribution scores per component
+contrib_PC1 <- abs(loadings[, 1]) / sum(abs(loadings[, 1]))
+contrib_PC2 <- abs(loadings[, 2]) / sum(abs(loadings[, 2]))
+
 #Plot
 pca_dist.p <-ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) +
   geom_point(size = 3.8, alpha = 0.9) +
@@ -290,6 +306,9 @@ pca_dist.p <-ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Reg
     axis.title   = element_text(size = 11),
     axis.text    = element_text(size = 9)
   )
+
+#Vis
+pca_dist.p
 
 ##### FINAL GRID ####
 
@@ -325,7 +344,7 @@ bottom_panel <- plot_grid(
 final_plot <- plot_grid(
   top_panel,
   middle_panel,
-  bottom_panel,
+  #bottom_panel,
   ncol = 1,
   rel_heights = c(1.8, 1,   1.6)   # Ajusta como quieras
 )

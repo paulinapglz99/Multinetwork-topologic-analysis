@@ -55,7 +55,8 @@ if (length(files)==0) stop("No files matching the pattern were found in input_di
 read_network <- function(path, type = opt$type) {
   message("DEBUG - type: ", paste0(type, collapse = ","))
   
-  type <- match.arg(type)  #From the opt parser
+  #type <- match.arg(type)  #From the opt parser
+  type <- match.arg(type, choices = c("auto","edgelist","adjacency"))
   
   ext <- tolower(tools::file_ext(path))
   
@@ -258,12 +259,27 @@ if (opt$make_html) {
   rmd <- file.path(opt$out_dir, "network_report.Rmd")
   
   #R Markdown head
+  # cat(
+  #   "---\n",
+  #   "title: \"Network Degree Distribution Analysis Report\"\n",
+  #   "output: html_document\n",
+  #   "---\n\n",
+  #   file = rmd,  sep = ""
+  # )
+  
   cat(
     "---\n",
     "title: \"Network Degree Distribution Analysis Report\"\n",
     "output: html_document\n",
     "---\n\n",
-    file = rmd,  sep = ""
+    "```{r setup, include=FALSE}\n",
+    "knitr::opts_chunk$set(\n",
+    "  fig.path = '',\n",
+    "  dev = 'pdf',\n",
+    "  dpi = 300\n",
+    ")\n",
+    "```\n\n",
+    file = rmd, sep = ""
   )
   
   #Load data
@@ -318,7 +334,7 @@ if (opt$make_html) {
   )
 
   cat(
-    "```{r, echo=FALSE, fig.width=7, fig.height=6}\n",
+    "```{r per_network_degree_plots, echo=FALSE, results='asis'}\n",
     "ggplot(deg_dists, aes(x = degree, y = Prob, color = network)) +\n",
     "  geom_point(size = 2, alpha = 0.7) +\n",
     "  geom_smooth(method = 'lm', se = FALSE, linetype = 'dashed', size = 1) +\n",
@@ -344,7 +360,14 @@ if (opt$make_html) {
   #Renderize HTML
   cat("Renderizing HTML \n")
   
-  rmarkdown::render(rmd, output_file = file.path("degree_report.html"), quiet = TRUE)
+  #rmarkdown::render(rmd, output_file = file.path("degree_report.html"), quiet = TRUE)
+  rmarkdown::render(
+    rmd,
+    output_file = "degree_report.html",
+    output_dir = opt$out_dir,
+    quiet = TRUE
+  )
+  
   cat("HTML report saved in:", file.path(opt$out_dir, "degree_report.html"), "\n")
 }
 

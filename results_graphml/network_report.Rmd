@@ -3,6 +3,14 @@ title: "Network Analysis Report"
 output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  fig.path = '',
+  dev = 'pdf',
+  dpi = 300
+)
+```
+
 ```{r, echo=FALSE}
 if (!requireNamespace('pacman', quietly = TRUE)) install.packages('pacman')
 pacman::p_load(data.table, ggplot2, ggpubr, purrr)
@@ -30,10 +38,10 @@ plot_specs <- data.frame(
     'size_giant_component', 'frac_giant_component', 'Q_modularity', 'perc_targeted_50'
   ),
   title = c(
-    'Number of vertices (genes)', 'Number of edges', 'Number of components',
-    'Number of communities (INFOMAP)', 'Mean degree of nodes', 'Average path length',
+    'Vertices (genes)', 'Edges', 'Components',
+    'Communities', 'Mean degree of nodes', 'Average path length',
     'Global clustering', 'Local clustering coefficient', 'Diameter', 'Global density',
-    'Size of the giant component', 'Fraction of giant component', 'Q modularity', 'Percolation threshold'
+    'Giant component size', 'Giant component fraction', 'Q modularity', 'Percolation threshold'
   ),
   ylab = c(
     'Number of vertices', 'Number of edges', 'Number of components',
@@ -49,7 +57,7 @@ plot_specs <- data.frame(
 )
 ```
 
-```{r, echo=FALSE, fig.height=4, fig.width=7}
+```{r, iterating_plots, echo=FALSE, fig.height=4, fig.width=7}
 walk2(plot_specs$var, seq_along(plot_specs$var), function(varname, idx) {
   p <- make_metric_plot(summary, varname, plot_specs$title[idx], plot_specs$ylab[idx], plot_specs$color[idx])
   print(p)

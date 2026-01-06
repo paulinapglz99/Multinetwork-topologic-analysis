@@ -319,12 +319,27 @@ if (opt$make_html) {
   rmd <- file.path(opt$out_dir, "network_report.Rmd")
   
   #R Markdown head
+  # cat(
+  #   "---\n",
+  #   "title: \"Network Analysis Report\"\n",
+  #   "output: html_document\n",
+  #   "---\n\n",
+  #   file = rmd,  sep = ""
+  # )
+  
   cat(
     "---\n",
     "title: \"Network Analysis Report\"\n",
     "output: html_document\n",
     "---\n\n",
-    file = rmd,  sep = ""
+    "```{r setup, include=FALSE}\n",
+    "knitr::opts_chunk$set(\n",
+    "  fig.path = '',\n",
+    "  dev = 'pdf',\n",
+    "  dpi = 300\n",
+    ")\n",
+    "```\n\n",
+    file = rmd, sep = ""
   )
   
   #Load data
@@ -388,7 +403,7 @@ if (opt$make_html) {
   
   #Chunk for iterating plots
   cat(
-    "```{r, echo=FALSE, fig.height=4, fig.width=7}\n",
+    "```{r, iterating_plots, echo=FALSE, fig.height=4, fig.width=7}\n",
     "walk2(plot_specs$var, seq_along(plot_specs$var), function(varname, idx) {\n",
     "  p <- make_metric_plot(summary, varname, plot_specs$title[idx], plot_specs$ylab[idx], plot_specs$color[idx])\n",
     "  print(p)\n",
@@ -400,10 +415,15 @@ if (opt$make_html) {
 #Renderize HTML
 cat("Renderizing HTML \n")
 
-rmarkdown::render(rmd, output_file = file.path("net_report.html"), quiet = TRUE)
+#rmarkdown::render(rmd, output_file = file.path("net_report.html"), quiet = TRUE)
+rmarkdown::render(
+  rmd,
+  output_file = "net_report.html",
+  output_dir = opt$out_dir,
+  quiet = TRUE
+)
+
 cat("HTML report saved in:", file.path(opt$out_dir, "net_report.html"), "\n")
 }
-
 q(status = 0)
-
 #END

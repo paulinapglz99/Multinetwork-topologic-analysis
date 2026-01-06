@@ -3,6 +3,10 @@ title: "Network Null Distribution Analysis Report"
 output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.path = '', dpi = 300)
+```
+
 ```{r, echo=FALSE}
 if (!requireNamespace('pacman', quietly = TRUE)) install.packages('pacman')
 pacman::p_load(data.table, ggplot2, ggpubr, purrr, dplyr, tidyr)

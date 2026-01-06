@@ -304,38 +304,6 @@ node_paths <- rbindlist(lapply(results, function(x) {
 }), fill = TRUE)
 if (nrow(node_paths) > 0) fwrite(node_paths, file.path(opt$out_dir, "networks_nodes_index.csv"))
 
-# # Extraer metadata del nombre del archivo
-# extract_metadata <- function(fname) {
-#   # Ejemplo: "Mayo_CRB_counts_AD_top10pct"
-#   fname_noext <- tools::file_path_sans_ext(fname)
-#   
-#   # Regex para extraer: <cohorte>_<region>_counts_<condition>_top*
-#   match <- str_match(fname_noext, "^(.*?)_(.*?)_counts_(AD|control)_")
-#   data.table(
-#     file_name = fname_noext,
-#     region = match[, 3],
-#     condition = match[, 4]
-#   )
-# }
-# 
-# # Construir metadata completa
-# extract_metadata <- function(fname) {
-#   fname_noext <- tools::file_path_sans_ext(fname)
-#   
-#   # Regex más flexible:
-#   # Captura: cohorte, región anatómica y diagnóstico (AD o control)
-#   # Ejemplo válido: ROSMAP_PCC_counts_AD, Mayo_TC_counts_control_top10pct
-#   match <- stringr::str_match(fname_noext,
-#                               "^([A-Za-z0-9]+)_([A-Za-z0-9]+)_counts_(AD|control)")
-#   
-#   data.table(
-#     file_name = fname_noext,
-#     cohort = match[, 2],
-#     region = match[, 3],
-#     condition = match[, 4]
-#   )
-# }
-
 cat("Analysis completed. Summary saved in:", file.path(opt$out_dir, "networks_summary.csv"), "\n")
 
 #Render an HTML report if requested
@@ -397,10 +365,10 @@ if (opt$make_html) {
   "    'size_giant_component', 'frac_giant_component', 'Q_modularity', 'perc_targeted_50'\n",
   "  ),\n",
   "  title = c(\n",
-  "    'Number of vertices (genes)', 'Number of edges', 'Number of components',\n",
-  "    'Number of communities', 'Mean degree of nodes', 'Average path length',\n",
+  "    'Vertices (genes)', 'Edges', 'Components',\n",
+  "    'Communities', 'Mean degree of nodes', 'Average path length',\n",
   "    'Global clustering', 'Local clustering coefficient', 'Diameter', 'Global density',\n",
-  "    'Size of the giant component', 'Fraction of giant component', 'Q modularity', 'Percolation threshold'\n",
+  "    'Giant component size', 'Giant component fraction', 'Q modularity', 'Percolation threshold'\n",
   "  ),\n",
   "  ylab = c(\n",
   "    'Number of vertices', 'Number of edges', 'Number of components',\n",

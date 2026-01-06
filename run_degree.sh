@@ -1,6 +1,6 @@
-Rscript ~/Multinetwork-topologic-analysis/degree_distributions.R \
--i ~/Multinetwork-topologic-analysis/test_data/graphmls \
--p ".*\\.graphml$" \
--o ~/Multinetwork-topologic-analysis/results_graphml_degree \
+Rscript ~/Desktop/local_work/Multinetwork-topologic-analysis/degree_distributions.R \
+-i ~/Desktop/local_work/fomo_networks \
+-p ".*\\.tsv$" \
+-o ~/Desktop/local_work/fomo_networks/prueba_grado_fixing \
 -w 2 \
 --make_html TRUE

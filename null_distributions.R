@@ -202,13 +202,25 @@ if (opt$make_html) {
   rmd <- file.path(opt$out_dir, "null_dis_network_report.Rmd")
   
   #R Markdown head
+  # cat(
+  #   "---\n",
+  #   "title: \"Network Null Distribution Analysis Report\"\n",
+  #   "output: html_document\n",
+  #   "---\n\n",
+  #   file = rmd,  sep = ""
+  # )
+  
   cat(
     "---\n",
     "title: \"Network Null Distribution Analysis Report\"\n",
     "output: html_document\n",
     "---\n\n",
-    file = rmd,  sep = ""
+    "```{r setup, include=FALSE}\n",
+    "knitr::opts_chunk$set(fig.path = '', dpi = 300)\n",
+    "```\n\n",
+    file = rmd, sep = ""
   )
+  
   
   #Load data
   cat(
@@ -264,7 +276,13 @@ if (opt$make_html) {
   
   #Renderize HTML
   cat("Renderizing HTML \n")
-  rmarkdown::render(rmd, output_file = file.path("null_dis_network_report.html"), quiet = TRUE)
+  #rmarkdown::render(rmd, output_file = file.path("null_dis_network_report.html"), quiet = TRUE)
+  rmarkdown::render(
+    rmd,
+    output_file = "null_dis_network_report.html",
+    output_dir = opt$out_dir,
+    quiet = TRUE
+  )
   cat("HTML report saved in:", file.path(opt$out_dir, "null_dis_network_report.html"), "\n")
 }
 

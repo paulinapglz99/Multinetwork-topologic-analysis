@@ -79,6 +79,115 @@ jaccard_index <- function(a, b) {
   length(intersect(a, b)) / length(union(a, b))
 }
 
+#Function to compute NMI for each region
+compute_nmi_region <- function(region_name, meta_df, min_genes = 3) {
+  submeta <- meta_df %>% dplyr::filter(region == region_name)
+  
+  #We need both phenos
+  if (!all(c("AD", "Control") %in% submeta$phenotype)) {
+    message("Skip region ", region_name, " because it does not have both phenotypes")
+    return(NULL)
+  }
+  
+  file_ad   <- submeta$filename[submeta$phenotype == "AD"]
+  file_ctrl <- submeta$filename[submeta$phenotype == "Control"]
+  
+  #Only the necessary cols
+  ad   <- data.table::fread(file_ad, select = c("node", "membership"))
+  ctrl <- data.table::fread(file_ctrl, select = c("node", "membership"))
+  
+  #Filter genes by minimal number of genes
+  if (!is.null(min_genes)) {
+    keep_ad   <- names(which(table(ad$membership)   >= min_genes))
+    keep_ctrl <- names(which(table(ctrl$membership) >= min_genes))
+    
+    ad   <- ad   %>% dplyr::filter(membership %in% keep_ad)
+    ctrl <- ctrl %>% dplyr::filter(membership %in% keep_ctrl)
+  }
+  
+  #Merge
+  merged <- dplyr::inner_join(ad, ctrl, by = "node", suffix = c("_AD", "_CTRL"))
+  
+  if (nrow(merged) == 0) {
+    message("Region ", region_name, ": 0 genes after filtering. NMI = NA.")
+    return(
+      tibble::tibble(
+        region = region_name,
+        n_genes_common = 0L,
+        NMI = NA_real_
+      )
+    )
+  }
+  
+  #NMI w/igraph
+  nmi_val <- igraph::compare(
+    merged$membership_AD,
+    merged$membership_CTRL,
+    method = "nmi"
+  )
+  
+  tibble::tibble(
+    Region = region_name,
+    n_genes_common = nrow(merged),
+    NMI = nmi_val
+  )
+}
+
+
+#Build like an enrich result
+
+create_enrichResult <- function(df,
+                                ontology = "MF",
+                                organism = "Homo sapiens",
+                                pAdjustMethod = "BH",
+                                pCutoff = 0.05,
+                                qCutoff = 0.2) {
+  
+  if (!requireNamespace("clusterProfiler", quietly = TRUE)) {
+    stop("clusterProfiler package is required")
+  }
+  
+  #Check required columns
+  required_cols <- c("ID", "Description", "GeneRatio", "BgRatio", "pvalue", 
+                     "p.adjust", "qvalue", "geneID", "Count")
+  
+  if (!all(required_cols %in% colnames(df))) {
+    stop("La tabla debe contener las columnas: ", paste(required_cols, collapse = ", "))
+  }
+  
+  #Vector of unique analyzed genes
+  gene <- unique(unlist(strsplit(df$geneID, split = "/")))
+  
+  #Get TERM2GENE list
+  geneSets <- df %>%
+    tidyr::separate_rows(geneID, sep = "/") %>%
+    dplyr::group_by(ID) %>%
+    dplyr::summarise(genes = list(unique(geneID)), .groups = "drop") %>%
+    tibble::deframe()
+  
+  #Deplete unwanted columns
+  df_core <- df[, ..required_cols]
+  
+  #Creatr enrichResult object
+  enrich_obj <- methods::new(
+    "enrichResult",
+    result = df_core,
+    pvalueCutoff = pCutoff,
+    pAdjustMethod = pAdjustMethod,
+    qvalueCutoff = qCutoff,
+    gene = gene,
+    universe = character(0),
+    geneSets = geneSets,
+    organism = organism,
+    ontology = ontology,
+    keytype = "SYMBOL",   
+    readable = FALSE
+  )
+  
+  return(enrich_obj)
+}
+
+
 #Read and Prepare Files
 files <- list.files(input_dir, pattern = pattern, full.names = TRUE)
 meta <- do.call(rbind, lapply(files, extract_info))
@@ -126,64 +235,10 @@ enrich_all <- enrich_all %>%
 
 #Using NMI per region
 
-#Function to compute NMI for each region
-compute_nmi_region <- function(region_name, meta_df, min_genes = 3) {
-  submeta <- meta_df %>% dplyr::filter(region == region_name)
-  
-  #We need both phenos
-  if (!all(c("AD", "Control") %in% submeta$phenotype)) {
-    message("Skip region ", region_name, " because it does not have both phenotypes")
-    return(NULL)
-  }
-  
-  file_ad   <- submeta$filename[submeta$phenotype == "AD"]
-  file_ctrl <- submeta$filename[submeta$phenotype == "Control"]
-  
-  #Only the necessary cols
-  ad   <- data.table::fread(file_ad, select = c("node", "membership"))
-  ctrl <- data.table::fread(file_ctrl, select = c("node", "membership"))
-  
-  #Filter genes by minimal number of genes
-  if (!is.null(min_genes)) {
-    keep_ad   <- names(which(table(ad$membership)   >= min_genes))
-    keep_ctrl <- names(which(table(ctrl$membership) >= min_genes))
-  
-    ad   <- ad   %>% dplyr::filter(membership %in% keep_ad)
-    ctrl <- ctrl %>% dplyr::filter(membership %in% keep_ctrl)
-  }
-  
-  #Merge
-  merged <- dplyr::inner_join(ad, ctrl, by = "node", suffix = c("_AD", "_CTRL"))
-  
-  if (nrow(merged) == 0) {
-    message("Region ", region_name, ": 0 genes after filtering. NMI = NA.")
-    return(
-      tibble::tibble(
-        region = region_name,
-        n_genes_common = 0L,
-        NMI = NA_real_
-      )
-    )
-  }
-  
-  #NMI w/igraph
-  nmi_val <- igraph::compare(
-    merged$membership_AD,
-    merged$membership_CTRL,
-    method = "nmi"
-  )
-  
-  tibble::tibble(
-    Region = region_name,
-    n_genes_common = nrow(merged),
-    NMI = nmi_val
-  )
-}
-
 #Get NMI for all regions
 nmi_results <- purrr::map_dfr(
   regions,
-  ~ compute_nmi_region(.x, meta_df = meta, min_genes = min_genes)
+  ~compute_nmi_region(.x, meta_df = meta, min_genes = min_genes)
 )
 
 #Save results 
@@ -259,7 +314,6 @@ jaccards.tb <- rbindlist(jaccards)
 ordered_regions <- c("HCN", "PCC", "TC", "DLPFC","CRB")
 jaccards.tb$Region <- factor(jaccards.tb$Region, levels = ordered_regions)
 print(table(jaccards.tb$Classification))
-
 #Save results <- RESULT #1
 #vroom::vroom_write(jaccards.tb, file = file.path(output_dir, "jaccards_all_regions.csv"))
 message("First Jaccard comparison completed and table saved!")
@@ -360,11 +414,7 @@ exclusive_CTRL <- jaccards.tb %>%
 names(exclusive_AD)[names(exclusive_AD) == "Module_AD"] <- "Module"
 names(exclusive_CTRL)[names(exclusive_CTRL) == "Module_Control"] <- "Module"
 
-# Unir data.frames por filas
-exclusive_modules <- rbind(exclusive_AD, exclusive_CTRL)
-
-
-# Unir data.frames por filas
+#Bind
 exclusive_modules <- rbind(exclusive_AD, exclusive_CTRL)
 
 #Add number of genes per module
@@ -382,6 +432,68 @@ exclusive_summary <- summary_all %>% filter(Classification %in% c("AD_exclusive"
 #Save results
 #vroom::vroom_write(exclusive_summary, file = file.path(output_dir, "exclusive_summary.csv"))
 
+#Exclusivity scores
+
+#Exclusive AD modules with Jaccard == 0
+exclusive_AD_0 <- jaccards.tb %>%
+  group_by(Region, Module_AD) %>%
+  summarise(
+    Min_Jaccard = min(Jaccard_Index),
+    .groups = "drop"
+  ) %>%
+  filter(Min_Jaccard == 0) %>%
+  mutate(Phenotype = "AD_exclusive") %>%
+  dplyr::rename(Module = Module_AD)
+
+#Exclusive Control Modules with Jaccard == 0
+exclusive_CTRL_0 <- jaccards.tb %>%
+  group_by(Region, Module_Control) %>%
+  summarise(
+    Min_Jaccard = min(Jaccard_Index),
+    .groups = "drop"
+  ) %>%
+  filter(Min_Jaccard == 0) %>%
+  mutate(Phenotype = "Control_exclusive") %>%
+  dplyr::rename(Module = Module_Control)
+
+#Bind both
+exclusive_0_all <- bind_rows(exclusive_AD_0, exclusive_CTRL_0)
+
+#Bind with enrich_all
+enrich_exclusive_0 <- enrich_all %>%
+  filter(Module %in% exclusive_0_all$Module) %>%
+  mutate(Region_Pheno = paste(Region, Phenotype, sep = "_"))
+
+enrich_split_list <- enrich_exclusive_0 %>%
+  split(.$Region_Pheno)
+
+# Si quieres los términos más comunes o más significativos por grupo
+enrich_summary <- enrich_exclusive_0 %>%
+  filter(p.adjust < 0.05) %>%
+  group_by(Phenotype, Region, Description) %>%
+  summarise(
+    n_modules = n_distinct(Module),
+    min_p = min(p.adjust),
+    example_genes = geneID[which.min(p.adjust)],
+    .groups = "drop"
+  ) %>%
+  arrange(Phenotype, Region, min_p)
+
+#Apply function
+# ego <- create_enrichResult(enrich_split_list[["CRB_AD"]], ontology = "BP")
+# 
+# x<-clusterProfiler::simplify(ego)
+
+# enrich_obj_list <- map(enrich_split_list, ~ create_enrichResult(.x, ontology = "BP"))
+# 
+# enrich_simplified_list <- map(enrich_obj_list, ~ simplify(
+#   .x,
+#   cutoff = 0.7,
+#   by = "p.adjust",
+#   select_fun = min,
+#   measure = "Wang"
+# ))
+
 ################################## PART 2 ################################## 
 
 #Phenotypic disagreement
@@ -393,7 +505,7 @@ exclusive_summary <- summary_all %>% filter(Classification %in% c("AD_exclusive"
 # 
 # And then you compare each pair between regions using, for example, the Jaccard index between their genes.
 # 
-# If two modules from different regions have a Jaccard index ≥ threshold (e.g. 0.8), you consider them ‘conserved between regions’.
+# If two modules from different regions have a Jaccard index ≥ threshold (e.g. 0.8), you consider them ‘conserved between regions’.
 
 #Goal: Identify exclusive modules (AD or Control) that appear in more than one region with high similarity (Jaccard_Index ≥ 0.8).
 
@@ -511,7 +623,7 @@ graph_df <- graph_df %>%
 g <- graph_from_data_frame(edges, vertices = graph_df, directed = FALSE)
 
 #Save graph
-igraph::write_graph(g, file = "cnetplot_conserved_modules.graphml", format = "graphml")
+#igraph::write_graph(g, file = "cnetplot_conserved_modules.graphml", format = "graphml")
 
 ########################## PLOTTING ########################## 
 
@@ -609,7 +721,6 @@ mini_meanjacc_heat <- ggplot(jaccard_summary, aes(x = "", y = Region, fill = mea
 
 mini_meanjacc_heat
 
-
 #Plot
 mini_median_jacc_heat <- ggplot(jaccard_summary, aes(x = "", y = Region, fill = median_jaccard)) +
   geom_tile(color = "white") +
@@ -633,11 +744,11 @@ mini_median_jacc_heat
 
 miniheats <- cowplot::plot_grid(mini_nmiheat, mini_meanjacc_heat,nrow = 1)
 
-#Save histograms
-ggsave(filename = file.path(output_dir, "miniheats.pdf"),
-       plot = miniheats,
-       width = 4,
-       height = 7)
+# #Save histograms
+# ggsave(filename = file.path(output_dir, "miniheats.pdf"),
+#        plot = miniheats,
+#        width = 4,
+#        height = 7)
 
 #Histogram of Jaccard values
 
@@ -699,10 +810,10 @@ jaccard.p <- plot_grid(jaccard_hist.p,
 jaccard.p
 
 #Save histograms
-ggsave(filename = file.path(output_dir, "jaccard_histogram.pdf"),
-       plot = jaccard.p,
-       width = 18,
-       height = 10)
+# ggsave(filename = file.path(output_dir, "jaccard_histogram.pdf"),
+#        plot = jaccard.p,
+#        width = 18,
+#        height = 10)
 
 #Visualize local proportion
 
@@ -754,6 +865,8 @@ global.p <- ggplot(summary_all, aes(x = Region, y = global_proportion, fill = Cl
   theme(
     panel.grid.minor = element_blank()
   )
+
+#Vis
 global.p 
 
 #Grid plot
@@ -761,10 +874,10 @@ proportions <- plot_grid(local.p, global.p, labels = c("A", "B"))
 proportions
 
 #Save histograms
-ggsave(filename = file.path(output_dir, "proportions.pdf"),
-       plot = proportions,
-       width = 13,
-       height = 7)
+# ggsave(filename = file.path(output_dir, "proportions.pdf"),
+#        plot = proportions,
+#        width = 13,
+#        height = 7)
 
 #Barplot
 barplot.p <- ggplot(candidates_exclusive_modules.c,

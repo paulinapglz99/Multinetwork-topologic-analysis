@@ -204,7 +204,7 @@ w_enrich <-enrichGO(gene = wide_hubs,
          keyType = 'SYMBOL',
          readable = TRUE,
          #universe = universe,
-         ont = "MF",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
+         ont = "BP",          #type of GO(Biological Process (BP), cellular Component (CC), Molecular Function (MF)
          pvalueCutoff = 0.05,
          qvalueCutoff = 0.10)
 
@@ -263,7 +263,6 @@ wide_hub_genes <- exclusive_AD_hubs_degree_filter$symbol
 ad_networks_persistent <- map(ad_networks, function(g) {
   igraph::induced_subgraph(g, vids = igraph::V(g)[name %in% wide_hub_genes])
 })
-
 
 #PREGUNTA 5: ¿Dónde aparecen estos genes en la red?
 #¿Estos genes hubs se agrupan en módulos específicos? ¿Están dispersos?

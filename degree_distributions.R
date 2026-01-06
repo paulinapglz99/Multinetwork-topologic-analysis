@@ -169,9 +169,27 @@ fit_distributions <- function(degree_freq) {
 
 
 #Function to analyze degree distributions
+pretty_network_name <- function(path) {
+  #only basename
+  nm <- basename(path)
+  #with no extension
+  nm <- tools::file_path_sans_ext(nm)
+  #and take - and _ our
+  nm <- gsub("[_-]+", " ", nm)
+  #colap multiple spaces
+  nm <- gsub("\\s+", " ", nm)
+  #remove spaces at the beginning and end
+  nm <- trimws(nm)
+  #Title Case
+  nm <- tools::toTitleCase(nm)
+  
+  nm
+}
 
 analyze_degrees <- function(path) {
   nm <- basename(path)
+  nm <- pretty_network_name(path)   # nombre "bonito"
+  
   g <- tryCatch(read_network(path), error = function(e) { message(e); return(NULL) })
   if (is.null(g)) return(NULL)
   

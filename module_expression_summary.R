@@ -2,7 +2,7 @@
 
 #Script: module_expression_summary.R
 #Goal: For each network, compute per-module average expression and eigengene
-#Usage: Rscript module_expression_summary.R --input_dir ./expression_matrices --module_dir ./module_info --out_dir ./module_outputs
+#Usage: Rscript module_expression_summary.R --input_dir ./expression_matrices --module_topos ./module_info --out_dir ./module_outputs
 
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman", repos = "https://cloud.r-project.org")
 if (!requireNamespace("optparse", quietly = TRUE)) install.packages("optparse", repos = "https://cloud.r-project.org")
@@ -19,7 +19,7 @@ opt <- parse_args(OptionParser(option_list = option_list))
 dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
 
 expr_files <- list.files(opt$input_dir, pattern = "\\.tsv$", full.names = TRUE)
-module_files <- list.files(opt$module_dir, pattern = "_nodes_summary\\.csv$", full.names = TRUE)
+module_files <- list.files(opt$module_topos, pattern = "_nodes_summary\\.csv$", full.names = TRUE)
 
 if (length(expr_files) == 0 || length(module_files) == 0) {
   stop("No input files found. Check input directory and patterns.")

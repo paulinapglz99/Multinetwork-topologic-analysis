@@ -737,12 +737,12 @@ mini_median_jacc_heat <- ggplot(jaccard_summary, aes(x = "", y = Region, fill = 
     panel.grid = element_blank(), 
     legend.position="none")
 
-mini_median_jacc_heat
-#lol
+mini_median_jacc_heat#lol
 
 #Plot panel
 
 miniheats <- cowplot::plot_grid(mini_nmiheat, mini_meanjacc_heat,nrow = 1)
+miniheats
 
 # #Save histograms
 # ggsave(filename = file.path(output_dir, "miniheats.pdf"),
@@ -909,3 +909,4 @@ barplot.p <- ggplot(candidates_exclusive_modules.c,
 barplot.p
 
 #What 
+

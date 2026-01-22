@@ -38,7 +38,7 @@ colnames(globals)
 #metric_cols <- colnames(globals)[2:20]
 metric_cols <-  c("n_nodes"    ,     "avg_path_len"        ,   "diameter"          ,     "global_density"        ,
                   "size_giant_component"  , "frac_giant_component",   "n_components"       ,    "clustering_local_mean" , "global_clustering"     ,
-                  "assortativity"  ,        "degree_mean"       ,     "degree_median"   ,           "kcore_max" ,            
+                  "assortativity"  ,        "degree_mean"       ,     "deg_median"   ,           "kcore_max" ,            
                   "Q_modularity"    ,       "perc_targeted_50"    ,   "n_communities"     ,     "largest_community_size"
 )
 
@@ -115,14 +115,45 @@ ggsave("heatmap_global_diffs.jpeg",
        dpi = 300
 )
 
+#Save plot
+ggsave("heatmap_global_diffs.pdf",
+       plot = heatmap_global,
+       device = "pdf",
+       width = 15,
+       height = 10,
+       units = "in",
+       dpi = 300
+)
+
 ############PLOT CORRELATIONS##############
 #See if certain metrics are co-varying
 
 cor_mat <- cor(globals %>% select(all_of(metric_cols)), use = "pairwise.complete.obs")
 
-pheatmap(cor_mat,
+cor_mat.p <- pheatmap(cor_mat,
          color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
          main = "Correlation between Network Metrics")
+
+#Save plot
+ggsave("cor_mat_metrics.jpeg",
+       plot = cor_mat.p,
+       device = "jpeg",
+       width = 10,
+       height = 10,
+       units = "in",
+       dpi = 300
+)
+
+#Save plot
+ggsave("cor_mat_metrics.pdf",
+       plot = cor_mat.p,
+       device = "pdf",
+       width = 10,
+       height = 10,
+       units = "in",
+       dpi = 300
+)
+
 
 ############PCA of regions by metrics################
 
@@ -178,6 +209,16 @@ pca
 ggsave("pca-globals-louvain.jpeg",
        plot = pca,
        device = "jpeg",
+       width = 5,
+       height = 5,
+       units = "in",
+       dpi = 300
+)
+
+#Save plot
+ggsave("pca-globals-louvain.pdf",
+       plot = pca,
+       device = "pdf",
        width = 5,
        height = 5,
        units = "in",
@@ -242,8 +283,8 @@ heatmap_dist <- ggplot(dist_long, aes(Network1, Network2, fill = Distance)) +
   scale_fill_viridis_c(
     guide = guide_colorbar(
       position = "top",
-      barheight = unit(4, "pt"),    
-      barwidth  = unit(120, "pt"),  
+      barheight = unit(10, "pt"),    
+      barwidth  = unit(140, "pt"),  
       title.position = "top"
     )
   ) +
@@ -253,100 +294,94 @@ heatmap_dist <- ggplot(dist_long, aes(Network1, Network2, fill = Distance)) +
   theme_minimal() +
   theme(
     panel.grid = element_blank(),
-    axis.text.x = element_text(angle = 90, hjust = 1, size = 9),
-    axis.text.y = element_text(size = 9),
+    axis.text.x = element_text(angle = 90, hjust = 1, size =15),
+    axis.text.y = element_text(size = 15),
     legend.position = "top",
-    legend.title = element_text(size = 8),
-    legend.text  = element_text(size = 7)
+    legend.title = element_text(size = 15),
+    legend.text  = element_text(size = 15)
   ) +
   labs(title = " ", x = "", y = "")
 
 #Vis
 heatmap_dist
-
-#Convert the matrix distance into a pca object
-pca_dist <- prcomp(dist_matrix, center = TRUE, scale. = TRUE)
-
-#Get scores and plot
-pca_df <- as.data.frame(pca_dist$x) %>%
-  rownames_to_column("RegionPhenotype") %>%
-  separate(RegionPhenotype, into = c("Region", "Phenotype"), sep = " ")
-var_exp <- (pca_dist$sdev^2 / sum(pca_dist$sdev^2)) * 100
-pc1 <- round(var_exp[1], 1)
-pc2 <- round(var_exp[2], 1)
-
-#See contribution scores
-#Get loadings
-loadings <- pca_dist$rotation
-
-#Contribution scores per component
-contrib_PC1 <- abs(loadings[, 1]) / sum(abs(loadings[, 1]))
-contrib_PC2 <- abs(loadings[, 2]) / sum(abs(loadings[, 2]))
-
-#Plot
-pca_dist.p <-ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) +
-  geom_point(size = 3.8, alpha = 0.9) +
-  geom_text_repel(size = 3, max.overlaps = 10, box.padding = 0.3, point.padding = 0.2,
-                  show.legend = FALSE) +
-  scale_color_manual(
-    values = c("control" = "cornflowerblue", "AD" = "red4"),
-    name = "Group"
-  ) +
-  labs(
-    title = "",
-    x = paste0("PC1 (", pc1, "% var)"),
-    y = paste0("PC2 (", pc2, "% var)")
-  ) +
-  theme_cowplot() +
-  theme(
-    legend.position = "top",
-    legend.title = element_text(size = 10),
-    legend.text  = element_text(size = 9),
-    plot.title   = element_text(hjust = 0.5),
-    axis.title   = element_text(size = 11),
-    axis.text    = element_text(size = 9)
-  )
-
-#Vis
-pca_dist.p
+# 
+# #Convert the matrix distance into a pca object
+# pca_dist <- prcomp(dist_matrix, center = TRUE, scale. = TRUE)
+# 
+# #Get scores and plot
+# pca_df <- as.data.frame(pca_dist$x) %>%
+#   rownames_to_column("RegionPhenotype") %>%
+#   separate(RegionPhenotype, into = c("Region", "Phenotype"), sep = " ")
+# var_exp <- (pca_dist$sdev^2 / sum(pca_dist$sdev^2)) * 100
+# pc1 <- round(var_exp[1], 1)
+# pc2 <- round(var_exp[2], 1)
+# 
+# #See contribution scores
+# #Get loadings
+# loadings <- pca_dist$rotation
+# 
+# #Contribution scores per component
+# contrib_PC1 <- abs(loadings[, 1]) / sum(abs(loadings[, 1]))
+# contrib_PC2 <- abs(loadings[, 2]) / sum(abs(loadings[, 2]))
+# 
+# #Plot
+# pca_dist.p <-ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) +
+#   geom_point(size = 3.8, alpha = 0.9) +
+#   geom_text_repel(size = 3, max.overlaps = 10, box.padding = 0.3, point.padding = 0.2,
+#                   show.legend = FALSE) +
+#   scale_color_manual(
+#     values = c("control" = "cornflowerblue", "AD" = "red4"),
+#     name = "Group"
+#   ) +
+#   labs(
+#     title = "",
+#     x = paste0("PC1 (", pc1, "% var)"),
+#     y = paste0("PC2 (", pc2, "% var)")
+#   ) +
+#   theme_cowplot() +
+#   theme(
+#     legend.position = "top",
+#     legend.title = element_text(size = 10),
+#     legend.text  = element_text(size = 9),
+#     plot.title   = element_text(hjust = 0.5),
+#     axis.title   = element_text(size = 11),
+#     axis.text    = element_text(size = 9)
+#   )
+# 
+# #Vis
+# pca_dist.p
 
 ##### FINAL GRID ####
 
 library(cowplot)
 
-# Panel A + B lado a lado (heatmap + dendrograma)
+#PanelA+B
+
 top_panel <- plot_grid(
-  heatmap_dist,
-  pca_dist.p,
+  heatmap_global,
+  jaccard_global_connect,
   labels = c("A", "B"),
   label_size = 14,
   ncol = 2,
-  rel_widths = c(2, 1)   # A más grande que B
-)
+  rel_widths = c(2, 1))
+top_panel
 
-# Panel C (miniheatmap)
+#Midd
 middle_panel <- plot_grid(
-  dendro,
-  labels = "C",
+  pca,
+  heatmap_dist,
+  labels =  c("C", "D"),
   label_size = 14,
-  ncol = 1
+  ncol = 2
 )
+middle_panel
 
-# Panel D (PCA)
-bottom_panel <- plot_grid(
-  miniheat,
-  labels = "D",
-  label_size = 14,
-  ncol = 1
-)
-
-# Figura final: (A|B) / C / D
+#Finally Figura final: (A|B) / C / D
 final_plot <- plot_grid(
   top_panel,
   middle_panel,
-  #bottom_panel,
-  ncol = 1,
-  rel_heights = c(1.8, 1,   1.6)   # Ajusta como quieras
+  ncol = 1#,
+  #rel_heights = c(1.8, 1,   1.6)
 )
 
 # Mostrar
@@ -358,9 +393,14 @@ ggsave(
   plot = final_plot,
   width = 14,
   height = 16,
-  dpi = 300
-)
-
+  dpi = 300)
+# Guardar
+ggsave(
+  "final_global_figure.pdf",
+  plot = final_plot,
+  width = 14,
+  height = 16,
+  dpi = 300)
 
 ############PLOT ALL METRICS ##############
 

@@ -76,7 +76,7 @@ demographics_dx <- metadata_all %>%
     N = n_distinct(individualID),
     Age_death = mean_sd(age_death),
     PMI = mean_sd(pmi),
-    # Education = mean_sd(educ),  # Uncomment if needed
+    # Education = mean_sd(educ),
     Male = sum(sex == "male", na.rm = TRUE),
     Female = sum(sex == "female", na.rm = TRUE),
     APOE4_carriers = sum(str_detect(apoe_genotype, "4"), na.rm = TRUE),
@@ -86,3 +86,4 @@ demographics_dx <- metadata_all %>%
 #Output
 vroom_write(file = "demographics.txt", demographics_dx)
 
+#THE END

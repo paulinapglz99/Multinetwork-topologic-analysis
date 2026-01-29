@@ -36,11 +36,26 @@ colnames(globals)
 
 #Define metrics
 #metric_cols <- colnames(globals)[2:20]
-metric_cols <-  c("n_nodes"    ,     "avg_path_len"        ,   "diameter"          ,     "global_density"        ,
-                  "size_giant_component"  , "frac_giant_component",   "n_components"       ,    "clustering_local_mean" , "global_clustering"     ,
-                  "assortativity"  ,        "degree_mean"       ,     "deg_median"   ,           "kcore_max" ,            
-                  "Q_modularity"    ,       "perc_targeted_50"    ,   "n_communities"     ,     "largest_community_size"
+metric_labels <- c(
+  n_nodes                 = "Number of nodes",
+  avg_path_len            = "Average path length",
+  diameter                = "Diameter",
+  global_density          = "Global density",
+  size_giant_component    = "Giant component size",
+  frac_giant_component    = "Fraction of giant component",
+  n_components            = "Number of components",
+  clustering_local_mean   = "Mean local clustering",
+  global_clustering       = "Global clustering",
+  assortativity           = "Assortativity",
+  degree_mean             = "Mean degree",
+  degree_median           = "Median degree",
+  kcore_max               = "Maximum k-core",
+  Q_modularity             = "Modularity (Q)",
+  perc_targeted_50        = "Targeted attack (50%)",
+  n_communities           = "Number of communities",
+  largest_community_size  = "Largest community size"
 )
+
 
 #Compute means per group
 means <- globals %>%
@@ -106,24 +121,24 @@ heatmap_global<- grid::grid.grabExpr({
 heatmap_global
 
 #Save plot
-ggsave("heatmap_global_diffs.jpeg",
-       plot = heatmap_global,
-       device = "jpeg",
-       width = 15,
-       height = 10,
-       units = "in",
-       dpi = 300
-)
+# ggsave("heatmap_global_diffs.jpeg",
+#        plot = heatmap_global,
+#        device = "jpeg",
+#        width = 15,
+#        height = 10,
+#        units = "in",
+#        dpi = 300
+# )
 
 #Save plot
-ggsave("heatmap_global_diffs.pdf",
-       plot = heatmap_global,
-       device = "pdf",
-       width = 15,
-       height = 10,
-       units = "in",
-       dpi = 300
-)
+# ggsave("heatmap_global_diffs.pdf",
+#        plot = heatmap_global,
+#        device = "pdf",
+#        width = 15,
+#        height = 10,
+#        units = "in",
+#        dpi = 300
+# )
 
 ############PLOT CORRELATIONS##############
 #See if certain metrics are co-varying
@@ -134,26 +149,25 @@ cor_mat.p <- pheatmap(cor_mat,
          color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
          main = "Correlation between Network Metrics")
 
-#Save plot
-ggsave("cor_mat_metrics.jpeg",
-       plot = cor_mat.p,
-       device = "jpeg",
-       width = 10,
-       height = 10,
-       units = "in",
-       dpi = 300
-)
-
-#Save plot
-ggsave("cor_mat_metrics.pdf",
-       plot = cor_mat.p,
-       device = "pdf",
-       width = 10,
-       height = 10,
-       units = "in",
-       dpi = 300
-)
-
+# #Save plot
+# ggsave("cor_mat_metrics.jpeg",
+#        plot = cor_mat.p,
+#        device = "jpeg",
+#        width = 10,
+#        height = 10,
+#        units = "in",
+#        dpi = 300
+# )
+# 
+# #Save plot
+# ggsave("cor_mat_metrics.pdf",
+#        plot = cor_mat.p,
+#        device = "pdf",
+#        width = 10,
+#        height = 10,
+#        units = "in",
+#        dpi = 300
+# )
 
 ############PCA of regions by metrics################
 
@@ -184,7 +198,7 @@ contrib_PC2 <- abs(loadings_res[, 2]) / sum(abs(loadings_res[, 2]))
 safe_ellipse <- function(...) {
   tryCatch(stat_ellipse(...), error = function(e) NULL)
 }
-pca <- ggplot(pca_df, aes(x = PC1, y = PC2,
+pca.p <- ggplot(pca_df, aes(x = PC1, y = PC2,
                           color = Phenotype,
                           label = Region)) +
   geom_point(size = 4) +
@@ -203,27 +217,91 @@ pca <- ggplot(pca_df, aes(x = PC1, y = PC2,
   )
 
 #Vis
-pca
+pca.p
 
 #Save plot
-ggsave("pca-globals-louvain.jpeg",
-       plot = pca,
+# ggsave("pca-globals-louvain.jpeg",
+#        plot = pca.p,
+#        device = "jpeg",
+#        width = 5,
+#        height = 5,
+#        units = "in",
+#        dpi = 300
+# )
+# 
+# #Save plot
+# ggsave("pca-globals-louvain.pdf",
+#        plot = pca.p,
+#        device = "pdf",
+#        width = 5,
+#        height = 5,
+#        units = "in",
+#        dpi = 300
+# )
+
+#Contribution to PCs
+
+contrib <- sweep(pca_res$rotation^2, 2, colSums(pca_res$rotation^2), FUN = "/") * 100
+
+contrib.df <- as.data.frame(contrib[, 1:2]) %>% 
+  rownames_to_column("variable") %>% 
+  pivot_longer(
+    cols = starts_with("PC"),
+    names_to = "PC",
+    values_to = "contribution"
+  ) %>% 
+  mutate(variable = factor(
+    variable,
+    levels = metric_cols,
+    labels = metric_labels[metric_cols]
+  )) %>%
+  group_by(PC) %>%
+  arrange(desc(contribution), .by_group = TRUE) %>%
+  mutate(variable = factor(variable, levels = variable)) %>%
+  ungroup()
+
+contrib.p <- ggplot(contrib.df,
+       aes(x = variable, y = contribution, fill = PC)) +
+  geom_col(show.legend = TRUE) +
+  coord_flip() +
+  facet_wrap(~ PC, scales = "free_y") +
+  scale_fill_manual(
+    values = c(
+      "PC1" = "#1446A0",
+      "PC2" = "#7d1538"
+    )
+  ) +
+  labs(
+    x = "Variable",
+    y = "Contribution (%)",
+    title = "Variable contributions to PC1 and PC2"
+  ) +
+  theme_cowplot()
+
+#Vis
+
+contrib.p
+
+#Save plot
+
+ggsave("contributions_pca.jpeg",
+       plot = contrib.p,
        device = "jpeg",
-       width = 5,
-       height = 5,
+       width = 15,
+       height = 13,
        units = "in",
        dpi = 300
 )
 
-#Save plot
-ggsave("pca-globals-louvain.pdf",
-       plot = pca,
+ggsave("contributions_pca.pdf",
+       plot = contrib.p,
        device = "pdf",
-       width = 5,
-       height = 5,
+       width = 15,
+       height = 13,
        units = "in",
        dpi = 300
 )
+
 
 ############PCA of euclidean distance matrix ################
 
@@ -305,51 +383,51 @@ heatmap_dist <- ggplot(dist_long, aes(Network1, Network2, fill = Distance)) +
 #Vis
 heatmap_dist
 # 
-# #Convert the matrix distance into a pca object
-# pca_dist <- prcomp(dist_matrix, center = TRUE, scale. = TRUE)
-# 
-# #Get scores and plot
-# pca_df <- as.data.frame(pca_dist$x) %>%
-#   rownames_to_column("RegionPhenotype") %>%
-#   separate(RegionPhenotype, into = c("Region", "Phenotype"), sep = " ")
-# var_exp <- (pca_dist$sdev^2 / sum(pca_dist$sdev^2)) * 100
-# pc1 <- round(var_exp[1], 1)
-# pc2 <- round(var_exp[2], 1)
-# 
-# #See contribution scores
-# #Get loadings
-# loadings <- pca_dist$rotation
-# 
-# #Contribution scores per component
-# contrib_PC1 <- abs(loadings[, 1]) / sum(abs(loadings[, 1]))
-# contrib_PC2 <- abs(loadings[, 2]) / sum(abs(loadings[, 2]))
-# 
-# #Plot
-# pca_dist.p <-ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) +
-#   geom_point(size = 3.8, alpha = 0.9) +
-#   geom_text_repel(size = 3, max.overlaps = 10, box.padding = 0.3, point.padding = 0.2,
-#                   show.legend = FALSE) +
-#   scale_color_manual(
-#     values = c("control" = "cornflowerblue", "AD" = "red4"),
-#     name = "Group"
-#   ) +
-#   labs(
-#     title = "",
-#     x = paste0("PC1 (", pc1, "% var)"),
-#     y = paste0("PC2 (", pc2, "% var)")
-#   ) +
-#   theme_cowplot() +
-#   theme(
-#     legend.position = "top",
-#     legend.title = element_text(size = 10),
-#     legend.text  = element_text(size = 9),
-#     plot.title   = element_text(hjust = 0.5),
-#     axis.title   = element_text(size = 11),
-#     axis.text    = element_text(size = 9)
-#   )
-# 
-# #Vis
-# pca_dist.p
+#Convert the matrix distance into a pca object
+pca_dist <- prcomp(dist_matrix, center = TRUE, scale. = TRUE)
+
+#Get scores and plot
+pca_df <- as.data.frame(pca_dist$x) %>%
+  rownames_to_column("RegionPhenotype") %>%
+  separate(RegionPhenotype, into = c("Region", "Phenotype"), sep = " ")
+var_exp <- (pca_dist$sdev^2 / sum(pca_dist$sdev^2)) * 100
+pc1 <- round(var_exp[1], 1)
+pc2 <- round(var_exp[2], 1)
+
+#See contribution scores
+#Get loadings
+loadings <- pca_dist$rotation
+
+#Contribution scores per component
+contrib_PC1 <- abs(loadings[, 1]) / sum(abs(loadings[, 1]))
+contrib_PC2 <- abs(loadings[, 2]) / sum(abs(loadings[, 2]))
+
+#Plot
+pca_dist.p <-ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) +
+  geom_point(size = 3.8, alpha = 0.9) +
+  geom_text_repel(size = 3, max.overlaps = 10, box.padding = 0.3, point.padding = 0.2,
+                  show.legend = FALSE) +
+  scale_color_manual(
+    values = c("control" = "cornflowerblue", "AD" = "red4"),
+    name = "Group"
+  ) +
+  labs(
+    title = "",
+    x = paste0("PC1 (", pc1, "% var)"),
+    y = paste0("PC2 (", pc2, "% var)")
+  ) +
+  theme_cowplot() +
+  theme(
+    legend.position = "top",
+    legend.title = element_text(size = 10),
+    legend.text  = element_text(size = 9),
+    plot.title   = element_text(hjust = 0.5),
+    axis.title   = element_text(size = 11),
+    axis.text    = element_text(size = 9)
+  )
+
+#Vis
+pca_dist.p
 
 ##### FINAL GRID ####
 
@@ -358,25 +436,25 @@ library(cowplot)
 #PanelA+B
 
 top_panel <- plot_grid(
-  heatmap_global,
-  jaccard_global_connect,
+  heatmap_dist,
+  pca.p,
   labels = c("A", "B"),
   label_size = 14,
   ncol = 2,
-  rel_widths = c(2, 1))
+  rel_widths = c(1, 1))
 top_panel
 
-#Midd
+#Midd panel
 middle_panel <- plot_grid(
-  pca,
-  heatmap_dist,
+  heatmap_global,
+  jaccard_global_connect,
   labels =  c("C", "D"),
   label_size = 14,
   ncol = 2
 )
 middle_panel
 
-#Finally Figura final: (A|B) / C / D
+#Finally
 final_plot <- plot_grid(
   top_panel,
   middle_panel,
@@ -384,17 +462,17 @@ final_plot <- plot_grid(
   #rel_heights = c(1.8, 1,   1.6)
 )
 
-# Mostrar
+#Vis
 final_plot
 
-# Guardar
+#Save
 ggsave(
   "final_global_figure.jpeg",
   plot = final_plot,
-  width = 14,
-  height = 16,
+  width = 16,
+  height = 18,
   dpi = 300)
-# Guardar
+#Save
 ggsave(
   "final_global_figure.pdf",
   plot = final_plot,

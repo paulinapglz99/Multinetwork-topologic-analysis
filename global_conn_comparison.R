@@ -167,10 +167,10 @@ miniheat <- ggplot(heatmap.df, aes(x = "AD vs Control",
 miniheat
 
 #Save histograms
-ggsave(filename = file.path(opt$out_dir, "miniheat.jpeg"), 
-       plot = miniheat, 
-       width = 5, 
-       height = 7)
+# ggsave(filename = file.path(opt$out_dir, "miniheat.jpeg"), 
+#        plot = miniheat, 
+#        width = 5, 
+#        height = 7)
 
 #Barplot
 
@@ -179,45 +179,44 @@ jaccard_global_connect <- heatmap.df %>%
   ggplot(aes(x = jaccard, y = region, fill = jaccard)) +
   geom_col(width = 0.95,
            color = "black",        # color del borde de la barra
-           linewidth = 0.4)+         # grosor del borde) +
+           linewidth = 1)+         # grosor del borde) +
   geom_text(aes(label = round(jaccard, 3)),
-            hjust = 1.45,
+            hjust = 1.3,
             color = "white",
-            size = 4,
+            size = 8,
             fontface = "bold") +
   scale_fill_gradient(low = "steelblue", high = "firebrick") +
   labs(title = "Global connectivity overlap", 
        x = "", y = "") +
-  theme_minimal(base_size = 14) +
+  theme_minimal(base_size = 20) +
   theme(
     legend.position = "none",
-    plot.title = element_text(hjust = 0.5),
+    plot.title = element_text(hjust = 0.4),
     panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank()
   )
 jaccard_global_connect
 
 #Save plot
-ggsave("jaccard_global_connect.jpeg",
-       plot = jaccard_global_connect,
-       device = "jpeg",
-       width = 5,
-       height = 5,
-       units = "in",
-       dpi = 300
-)
-
-#Save plot
-ggsave("jaccard_global_connect.pdf",
-       plot = jaccard_global_connect,
-       device = "pdf",
-       width = 5,
-       height = 5,
-       units = "in",
-       dpi = 300
-)
-
-
+# ggsave("jaccard_global_connect.jpeg",
+#        plot = jaccard_global_connect,
+#        device = "jpeg",
+#        width = 5,
+#        height = 5,
+#        units = "in",
+#        dpi = 300
+# )
+# 
+# #Save plot
+# ggsave("jaccard_global_connect.pdf",
+#        plot = jaccard_global_connect,
+#        device = "pdf",
+#        width = 5,
+#        height = 5,
+#        units = "in",
+#        dpi = 300
+# )
+#
 
 #Get sets of edges function
 get_edge_set <- function(g) {
@@ -227,6 +226,7 @@ get_edge_set <- function(g) {
 
 opt$input_dir <- "~/Desktop/local_work/fomo_networks/"
 opt$out_dir  <- "~/Desktop/local_work/fomo_networks/plots"
+setwd(opt$out_dir)
 
 #Get files
 files <- list.files(opt$input_dir, pattern = opt$pattern, full.names = TRUE)

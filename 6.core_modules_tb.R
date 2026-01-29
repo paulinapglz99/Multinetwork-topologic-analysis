@@ -276,7 +276,7 @@ module_gene_counts <- tibble(
 #If no row has ‘Similar’, then this Module_AD is AD-exclusive.
 
 #Thresholds
-upp_thres <- 0.7
+upp_thres <- 0.6
 low_thres <- 0.2
 
 #Loop to calculate Jaccards per region
@@ -657,7 +657,7 @@ module_counts.p <- ggplot(module_counts, aes(x = Region, y = N_modules, fill = P
   scale_y_continuous(breaks = c(0:max(module_counts$N_modules))) +
   labs(
     title = "",
-    y = "N modules",
+    y = "N modules (Louvain)",
     x = ""
   )
 
@@ -741,7 +741,12 @@ mini_median_jacc_heat#lol
 
 #Plot panel
 
-miniheats <- cowplot::plot_grid(mini_nmiheat, mini_meanjacc_heat,nrow = 1)
+miniheats <- cowplot::plot_grid(mini_nmiheat, 
+                                mini_meanjacc_heat,
+                                nrow = 1,
+                                labels =  c("B", "C"),
+                                label_size = 14,
+                                ncol = 2)
 miniheats
 
 # #Save histograms
@@ -757,7 +762,7 @@ jaccard_hist.p <- ggplot(jaccards.tb, aes(x = Jaccard_Index)) +
   #geom_density(aes(y = ..count.. * 0.005), adjust = 10,  na.rm = TRUE, color = "orange", size = 1) +
   geom_vline(xintercept = low_thres, linetype = "dashed", color = "red", size = 1) +
   geom_vline(xintercept = upp_thres, linetype = "dashed", color = "darkgreen", size = 1) +
-  scale_y_continuous(trans = "log10", limits = c(1, NA)) +  # evita problemas con ceros
+  scale_y_continuous(trans = "log10", limits = c(1, NA)) +
   labs(
     title = "Global",
     x = "Jaccard Index",
@@ -771,8 +776,7 @@ jaccard_hist.p <- ggplot(jaccards.tb, aes(x = Jaccard_Index)) +
     axis.title.y = element_text(size = 9),
     axis.text = element_text(size = 11),
     panel.grid.minor = element_blank(),
-    panel.grid.major.x = element_blank()
-  )
+    panel.grid.major.x = element_blank())
 
 jaccard_hist.p
 
@@ -810,10 +814,26 @@ jaccard.p <- plot_grid(jaccard_hist.p,
 jaccard.p
 
 #Save histograms
-# ggsave(filename = file.path(output_dir, "jaccard_histogram.pdf"),
-#        plot = jaccard.p,
-#        width = 18,
-#        height = 10)
+ggsave(filename = file.path(output_dir, "jaccard_histogram.pdf"),
+       plot = jaccard.p,
+       width = 18,
+       height = 10)
+
+#Save
+# ggsave(
+#   file.path(output_dir, "jaccard_histogram.pdf"),
+#   plot = jaccard.p,
+#   width = 18,
+#   height = 10,
+#   dpi = 300)
+# #Save
+# ggsave(
+#   file.path(output_dir, "jaccard_histogram.jpeg"),
+#   plot = jaccard.p,
+#   width = 18,
+#   height = 10,
+#   dpi = 300)
+# 
 
 #Visualize local proportion
 
@@ -837,7 +857,8 @@ local.p <- ggplot(summary_all, aes(x = Region, y = local_proportion, fill = Clas
     x = ""
   ) +
   theme_minimal(base_size = 13) +
-  theme(legend.position = "none")
+  theme(legend.position = "none", 
+        panel.grid = element_blank())
 
 #Vis 
 local.p
@@ -863,7 +884,7 @@ global.p <- ggplot(summary_all, aes(x = Region, y = global_proportion, fill = Cl
   ) +
   theme_minimal(base_size = 13) +
   theme(
-    panel.grid.minor = element_blank()
+    panel.grid = element_blank()
   )
 
 #Vis
@@ -873,40 +894,44 @@ global.p
 proportions <- plot_grid(local.p, global.p, labels = c("A", "B"))
 proportions
 
-#Save histograms
-# ggsave(filename = file.path(output_dir, "proportions.pdf"),
-#        plot = proportions,
-#        width = 13,
-#        height = 7)
+#Save
+ggsave(
+  filename = file.path(output_dir, "proportions_modules.pdf"),
+  plot = proportions,
+  width = 13,
+  height = 7,
+  dpi = 300)
+#Save
+ggsave(
+  filename = file.path(output_dir, "proportions_modules.jpeg"),
+  plot = proportions,
+  width = 13,
+  height = 7,
+  dpi = 300)
 
-#Barplot
-barplot.p <- ggplot(candidates_exclusive_modules.c,
-                    aes(x = Region, y = n, fill = Classification)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
-  geom_text(aes(label = paste0("n: ", n)),
-            position = position_dodge(width = 0.8),
-            vjust = -0.3, size = 3.5) +
-  scale_fill_manual(values = fill_colors) +
-  labs(title = "Exclusive Modules by Region and Phenotype",
-       x = "Brain Region",
-       y = "Number of Exclusive Modules",
-       fill = "Classification") +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-    axis.title.x = element_text(size = 13, face = "bold"),
-    axis.title.y = element_text(size = 13, face = "bold"),
-    axis.text.x = element_text(angle = 0, size = 11, margin = margin(t = -5)),
-    axis.text.y = element_text(size = 11),
-    legend.position = c(0.02, 0.98),
-    legend.justification = c(0, 1),
-    legend.title = element_text(face = "bold"),
-    legend.background = element_rect(fill = alpha("white", 0.7), color = NA),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank()
-  )
+#make panels
 
-barplot.p
+panel_counts <- cowplot::plot_grid(module_counts.p, 
+                                   mini_nmiheat,
+                                   labels =  c("A", "B"),
+                                   rel_widths = c(3, 1),
+                                   label_size = 14,
+                                   ncol = 2)
+panel_counts
 
-#What 
+#Save
+ggsave(
+  "panel_module_counts.jpeg",
+  plot = panel_counts,
+  width = 14,
+  height = 12,
+  dpi = 300)
+#Save
+ggsave(
+  "panel_module_counts.pdf",
+  plot = panel_counts,
+  width = 14,
+  height = 12,
+  dpi = 300)
 
+#What

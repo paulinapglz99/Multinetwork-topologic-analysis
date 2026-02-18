@@ -53,10 +53,9 @@ if (length(files)==0) stop("No files matching the pattern were found in input_di
 
 #Helper function: read a network from CSV/TSV/GraphML
 read_network <- function(path, type = opt$type) {
-  message("DEBUG - type: ", paste0(type, collapse = ","))
+  message("DEBUG - type recibido: ", paste0(type, collapse = ","))
   
-  #type <- match.arg(type)  #From the opt parser
-  type <- match.arg(type, choices = c("auto","edgelist","adjacency"))
+  type <- match.arg(type)  #From the opt parser
   
   ext <- tolower(tools::file_ext(path))
   
@@ -64,8 +63,8 @@ read_network <- function(path, type = opt$type) {
     g <- igraph::read_graph(path, format = "graphml")
     
   } else if (ext %in% c("csv", "tsv", "txt")) {
-    sep <- ifelse(ext == "tsv", "\t", ",")
-    df <- data.table::fread(path, sep = sep, header = TRUE, data.table = FALSE)
+    # sep <- ifelse(ext == "tsv", "\t", ",")
+    df <- data.table::fread(path, header = TRUE, data.table = FALSE)
     
     #EDGELIST
     if (type == "edgelist") {
@@ -80,7 +79,7 @@ read_network <- function(path, type = opt$type) {
       mat <- as.matrix(df)
       storage.mode(mat) <- "numeric"
       g <- igraph::graph_from_adjacency_matrix(mat, mode = "undirected", 
-                                              weighted = TRUE)
+                                               weighted = TRUE)
       
       #AUTO-DETECT
     } else if (type == "auto") {
@@ -115,7 +114,6 @@ read_network <- function(path, type = opt$type) {
   
   return(g)
 }
-
 #Function to fit distributions
 
 fit_distributions <- function(degree_freq) {

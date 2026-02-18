@@ -16,7 +16,8 @@ ok <- pacman::p_load(
   "jsonlite",
   "stringr",
   "optparse", 
-  "tools"
+  "tools",
+  "rmarkdown"
 )
 
 if (all(ok)) {
@@ -61,8 +62,8 @@ read_network <- function(path, type = opt$type) {
     g <- igraph::read_graph(path, format = "graphml")
     
   } else if (ext %in% c("csv", "tsv", "txt")) {
-    sep <- ifelse(ext == "tsv", "\t", ",")
-    df <- data.table::fread(path, sep = sep, header = TRUE, data.table = FALSE)
+   # sep <- ifelse(ext == "tsv", "\t", ",")
+    df <- data.table::fread(path, header = TRUE, data.table = FALSE)
     
     #EDGELIST
     if (type == "edgelist") {
@@ -318,30 +319,37 @@ if (opt$make_html) {
   
   rmd <- file.path(opt$out_dir, "network_report.Rmd")
   
-  #R Markdown head
-  # cat(
-  #   "---\n",
-  #   "title: \"Network Analysis Report\"\n",
-  #   "output: html_document\n",
-  #   "---\n\n",
-  #   file = rmd,  sep = ""
-  # )
+  #Leer summary ya guardado para calcular dimensiones
+  summary_dt <- fread(file.path(opt$out_dir, "networks_summary.csv"))
+  n_net <- nrow(summary_dt)
   
+  fig_h <- min(15, max(6, n_net * 0.3))  # dinámico con límite superior
+  fig_w <- 7
+  
+  #R Markdown head
   cat(
     "---\n",
     "title: \"Network Analysis Report\"\n",
     "output: html_document\n",
     "---\n\n",
-    "```{r setup, include=FALSE}\n",
-    "knitr::opts_chunk$set(\n",
-    "  fig.path = '',\n",
-    "  dev = 'pdf',\n",
-    "  dpi = 300\n",
-    ")\n",
-    "```\n\n",
-    file = rmd, sep = ""
+    file = rmd,  sep = ""
   )
   
+  # cat(
+  #   "---\n",
+  #   "title: \"Network Analysis Report\"\n",
+  #   "output: html_document\n",
+  #   "---\n\n",
+  #   "```{r setup, include=FALSE}\n",
+  #   "knitr::opts_chunk$set(\n",
+  #   "  fig.path = '',\n",
+  #   "  dev = 'pdf',\n",
+  #   "  dpi = 300\n",
+  #   ")\n",
+  #   "```\n\n",
+  #   file = rmd, sep = ""
+  # )
+  # 
   #Load data
   cat(
     "```{r, echo=FALSE}\n",
@@ -362,7 +370,7 @@ if (opt$make_html) {
     "    geom_line() +\n",
     "    geom_point(color = color, size = 2.5) +\n",
     "    labs(title = title, x = 'Network', y = ylab) +\n",
-    "    scale_y_continuous(limits = c(min(df[[metric]]), max(df[[metric]]))) +\n",
+    "    scale_y_continuous(limits = range(df[[metric]], na.rm = TRUE)) +\n",
     "    theme_pubclean() +\n",
     "    theme(legend.position = 'none', axis.text.x = element_text(angle=90, vjust=0.5, hjust=1))\n",
     "}\n",
@@ -402,14 +410,26 @@ if (opt$make_html) {
   )
   
   #Chunk for iterating plots
+  # cat(
+  #   "```{r, iterating_plots, echo=FALSE, fig.height=4, fig.width=7}\n",
+  #   "walk2(plot_specs$var, seq_along(plot_specs$var), function(varname, idx) {\n",
+  #   "  p <- make_metric_plot(summary, varname, plot_specs$title[idx], plot_specs$ylab[idx], plot_specs$color[idx])\n",
+  #   "  print(p)\n",
+  #   "})\n",
+  #   "```\n\n",
+  #   file = rmd, append = TRUE,  sep = ""
+  # )
+  
   cat(
-    "```{r, iterating_plots, echo=FALSE, fig.height=4, fig.width=7}\n",
+    "```{r, iterating_plots, echo=FALSE, fig.height=", fig_h, ", fig.width=", fig_w, "}\n",
     "walk2(plot_specs$var, seq_along(plot_specs$var), function(varname, idx) {\n",
     "  p <- make_metric_plot(summary, varname, plot_specs$title[idx], plot_specs$ylab[idx], plot_specs$color[idx])\n",
     "  print(p)\n",
     "})\n",
     "```\n\n",
-    file = rmd, append = TRUE,  sep = ""
+    file = rmd,
+    append = TRUE,
+    sep = ""
   )
   
 #Renderize HTML

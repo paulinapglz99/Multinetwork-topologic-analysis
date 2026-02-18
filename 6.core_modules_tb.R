@@ -16,7 +16,8 @@ pacman::p_load(
   "igraph", 
   "cowplot", 
   "pheatmap",
- "clusterProfiler"
+ "clusterProfiler", 
+ "org.Hs.eg.db"
 )
 
 #Parser
@@ -133,6 +134,40 @@ compute_nmi_region <- function(region_name, meta_df, min_genes = 3) {
   )
 }
 
+#Function to run GO enrichment 
+run_go_enrichment_ensembl <- function(
+    genes,
+    ont = "BP",
+    p_cutoff = 0.05,
+    q_cutoff = 0.2,
+    simplify_cutoff = 0.7
+) {
+  
+  # Protección mínima
+  if (length(genes) < 3) return(NULL)
+  
+  ego <- enrichGO(
+    gene          = genes,
+    OrgDb         = org.Hs.eg.db,
+    keyType       = "ENSEMBL",
+    ont           = ont,
+    pAdjustMethod = "BH",
+    pvalueCutoff  = p_cutoff,
+    qvalueCutoff  = q_cutoff,
+    readable      = TRUE
+  )
+  
+  if (is.null(ego) || nrow(ego@result) == 0) return(NULL)
+  
+  ego_simplified <- clusterProfiler::simplify(
+    ego,
+    cutoff     = simplify_cutoff,
+    by         = "p.adjust",
+    select_fun = min
+  )
+  
+  return(ego_simplified)
+}
 
 #Build like an enrich result
 
@@ -556,16 +591,164 @@ find_conserved_modules <- function(exclusive_df, modules_list, threshold = 0.6) 
 conserved_modules_across_regions <- find_conserved_modules(
   exclusive_modules,
   modules,
-  threshold = upp_thres
-)
+  threshold = upp_thres)
+
+conserved_modules_across_regions <- conserved_modules_across_regions %>%
+    mutate(Pair_ID = paste(Module_1, Module_2, sep = "__"))
 
 conserved_modules_across_regions
 
 #Save
 #vroom::vroom_write(conserved_modules_across_regions, file = file.path(output_dir, "conserved_exclusive_modules_across_regions.csv"))
 
-#What biological functions have the conserved modules?
+#I want to know about the intersection
 
+pair_genes_intersection <- conserved_modules_across_regions %>%
+  rowwise() %>%
+  mutate(
+    Genes_1 = list(modules[[Module_1]]),
+    Genes_2 = list(modules[[Module_2]]),
+    Genes_intersection = list(intersect(Genes_1, Genes_2)),
+    Genes_union = list(union(Genes_1, Genes_2)),
+    N_intersection = length(Genes_intersection),
+    N_union = length(Genes_union)
+  ) %>%
+  ungroup()
+
+#Filter pairs with sufficient signal
+
+min_genes_pair <- 3
+
+pair_genes_intersection <- pair_genes_intersection %>%
+  filter(N_intersection >= min_genes_pair)
+
+go_enrichment_by_pair <- setNames(
+  lapply(
+    pair_genes_intersection$Genes_intersection,
+    run_go_enrichment_ensembl),
+  pair_genes_intersection$Pair_ID)
+
+#Esta función convierte un objeto enrichResult en una red tipo cnet.
+build_cnet_network <- function(enrich_res,
+                               pair_id,
+                               output_dir = NULL) {
+  
+  # ---- checks ----
+  if (is.null(enrich_res) || nrow(enrich_res@result) == 0)
+    return(NULL)
+  
+  res <- as.data.frame(enrich_res)
+  
+  # ---- Aristas GO–Gene ----
+  edges <- res %>%
+    dplyr::select(ID, geneID) %>%
+    tidyr::separate_rows(geneID, sep = "/") %>%
+    dplyr::rename(
+      from = ID,
+      to   = geneID
+    ) %>%
+    dplyr::mutate(Pair_ID = pair_id)
+  
+  # ---- Nodos GO (CON p-valores) ----
+  nodes_go <- res %>%
+    dplyr::select(
+      ID,
+      Description,
+      pvalue,
+      p.adjust,
+      qvalue,
+      GeneRatio,
+      Count
+    ) %>%
+    distinct() %>%
+    dplyr::transmute(
+      name       = ID,
+      label      = Description,
+      type       = "GO",
+      Pair_ID    = pair_id,
+      pvalue     = pvalue,
+      p_adjust   = p.adjust,
+      qvalue     = qvalue,
+      GeneRatio  = GeneRatio,
+      Count      = Count
+    )
+  
+  # ---- Nodos genes ----
+  nodes_genes <- edges %>%
+    dplyr::select(to) %>%
+    distinct() %>%
+    dplyr::transmute(
+      name       = to,
+      label      = to,
+      type       = "Gene",
+      Pair_ID    = pair_id,
+      pvalue     = NA_real_,
+      p_adjust   = NA_real_,
+      qvalue     = NA_real_,
+      GeneRatio  = NA_character_,
+      Count      = NA_integer_
+    )
+  
+  nodes <- dplyr::bind_rows(nodes_go, nodes_genes)
+  
+  # ---- Construir igraph ----
+  g <- igraph::graph_from_data_frame(
+    d = edges,
+    vertices = nodes,
+    directed = FALSE
+  )
+  
+  # ---- Exportar GraphML ----
+  if (!is.null(output_dir)) {
+    dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+    
+    igraph::write_graph(
+      g,
+      file   = file.path(output_dir, paste0(pair_id, ".graphml")),
+      format = "graphml"
+    )
+  }
+  
+  return(g)
+}
+
+#Create cnet networks
+
+cnet_networks <- lapply(
+  names(go_enrichment_by_pair),
+  function(pair_id) {
+    build_cnet_network(
+      enrich_res = go_enrichment_by_pair[[pair_id]],
+      pair_id    = pair_id,
+      output_dir = "graphml_cnet_networks"
+    )
+  }
+)
+
+names(cnet_networks) <- names(go_enrichment_by_pair)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+conserved_modules_across_regions <- conserved_modules_across_regions[1,]
 #what are those modules?
 conserved_modules <- unique(c(
   conserved_modules_across_regions$Module_1,
@@ -589,10 +772,10 @@ conserved_bio_summary <- enrich_conserved %>%
   ) %>%
   arrange(desc(N_modules), Min_pval)
 
-conserved_bio_summary_f <- conserved_bio_summary %>% 
+conserved_bio_summary_f <- conserved_bio_summary %>%
   filter(N_modules >=2)
 
-enrich_conserved_f <- enrich_conserved %>% 
+enrich_conserved_f <- enrich_conserved %>%
   filter(Description %in% conserved_bio_summary_f$Description)
 
 #Concept plot like if we were cavernicolas
@@ -621,9 +804,100 @@ graph_df <- graph_df %>%
 
 #Create graph
 g <- graph_from_data_frame(edges, vertices = graph_df, directed = FALSE)
+plot(g)
 
 #Save graph
-#igraph::write_graph(g, file = "cnetplot_conserved_modules.graphml", format = "graphml")
+igraph::write_graph(g, file = "cnetplot_conserved_modules.graphml", format = "graphml")
+
+#Each module already has its set of genes, its individual enrichments (in enrich_all) and now I want to answer:
+#What biological functions are shared by the modules conserved across regions?
+# 
+# pair_genes_intersection <- conserved_modules_across_regions %>%
+#   rowwise() %>%
+#   mutate(
+#     Genes_1 = list(modules[[Module_1]]),
+#     Genes_2 = list(modules[[Module_2]]),
+#     Genes_intersection = list(intersect(Genes_1, Genes_2)),
+#     Genes_union = list(union(Genes_1, Genes_2)),
+#     N_intersection = length(Genes_intersection),
+#     N_union = length(Genes_union)
+#   ) %>%
+#   ungroup()
+# 
+# #Filter pairs with sufficient signal
+# 
+# min_genes_pair <- 5
+# 
+# pairs_valid <- pair_genes_intersection %>%
+#   filter(N_intersection >= min_genes_pair)
+# 
+# #Pairwise enrichment (INTERSECTION)
+# pairs_valid <- pairs_valid %>%
+#   dplyr::select(Pair_ID, Genes_intersection) %>%
+#   tibble::deframe()
+# 
+# pair_enrich <- lapply(names(pairs_valid), function(pid) {
+#   genes <- pairs_valid[[pid]]
+#   
+#   ego <- enrichGO(
+#     gene          = genes,
+#     OrgDb         = org.Hs.eg.db,
+#     keyType       = "ENSEMBL",
+#     ont           = "BP",
+#     pAdjustMethod = "BH",
+#     pvalueCutoff  = 0.05,
+#     qvalueCutoff  = 0.2
+#   )
+#   
+#   if (is.null(ego) || nrow(ego@result) == 0) return(NULL)
+#   
+#   return(list(
+#     enrich_object = ego,
+#     result_table= ego@result %>%
+#     mutate(Pair_ID = pid)))
+# })
+# 
+# #Simplofy terms
+# 
+# pair_enrich_simplified <- lapply(pair_enrich, function(x) {
+#   if (is.null(x)) return(NULL)
+#   
+#   ego_s <- simplify(
+#     x$enrich_object,
+#     cutoff = 0.85,
+#     by = "p.adjust",
+#     select_fun = min,
+#     measure = "Wang"
+#   )
+#   
+#   x$enrich_object_simplified <- ego_s
+#   x
+# })
+# 
+# pair_enrich_simplified[[1]]
+# simplified.enr.df <- as.data.frame(pair_enrich_simplified[[1]]$result_table)
+# 
+# edges <- simplified.enr.df %>%
+#   distinct(Description, geneID)
+# 
+# nodes <- unique(c(edges$Description, edges$geneID))
+# node_type <- ifelse(nodes %in% simplified.enr.df$Description, "GO term", "Gene")
+# 
+# unique_terms <- simplified.enr.df %>%
+#   group_by(Description) %>%
+#   summarise(p.adjust = min(p.adjust))
+# 
+# graph_df <- data.frame(name = nodes, type = node_type)
+# 
+# #Asign node type
+# graph_df <- graph_df %>%
+#   mutate(label_type = ifelse(type == "GO term", "Pathway", "Gene")) %>%
+#   left_join(unique_terms, by = c("name" = "Description")) %>%
+#   mutate(logp = ifelse(label_type == "Pathway", -log10(p.adjust), NA))
+# 
+# #Create graph
+# g <- graph_from_data_frame(edges, vertices = graph_df, directed = FALSE)
+# plot(g)
 
 ########################## PLOTTING ########################## 
 

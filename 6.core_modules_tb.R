@@ -603,14 +603,28 @@ conserved_modules_across_regions
 
 #I want to know about the intersection
 
-pair_genes_intersection <- conserved_modules_across_regions %>%
+pair_genes_sets <- conserved_modules_across_regions %>%
   rowwise() %>%
   mutate(
     Genes_1 = list(modules[[Module_1]]),
     Genes_2 = list(modules[[Module_2]]),
+    
+    # intersección
     Genes_intersection = list(intersect(Genes_1, Genes_2)),
+    
+    # exclusivos
+    Genes_unique_1 = list(setdiff(Genes_1, Genes_2)),
+    Genes_unique_2 = list(setdiff(Genes_2, Genes_1)),
+    
+    # unión
     Genes_union = list(union(Genes_1, Genes_2)),
+    
+    # tamaños
+    N_genes_1 = length(Genes_1),
+    N_genes_2 = length(Genes_2),
     N_intersection = length(Genes_intersection),
+    N_unique_1 = length(Genes_unique_1),
+    N_unique_2 = length(Genes_unique_2),
     N_union = length(Genes_union)
   ) %>%
   ungroup()
@@ -726,6 +740,164 @@ cnet_networks <- lapply(
 )
 
 names(cnet_networks) <- names(go_enrichment_by_pair)
+
+#plot frequent genes in overlap gene enrichment
+library(dplyr)
+library(ggplot2)
+library(purrr)
+
+gene_counts_all <- map2_df(
+  go_enrichment_by_pair,
+  names(go_enrichment_by_pair),
+  function(df, pair_name) {
+    df <- as.data.frame(df)
+    
+    # encontrar columna geneID
+    gene_col <- grep("geneID", colnames(df), value = TRUE)
+    
+    genes_list <- strsplit(df[[gene_col]], "/")
+    genes_list <- lapply(genes_list, unique)
+    
+    genes_vec <- unlist(genes_list)
+    
+    counts <- table(genes_vec)
+    
+    data.frame(
+      pair = pair_name,
+      gene = names(counts),
+      count = as.numeric(counts)
+    )
+  }
+)
+
+# top genes por comparación
+top_genes <- gene_counts_all %>%
+  group_by(pair) %>%
+  arrange() %>% 
+ # slice_max(count, n = 15) %>%
+  ungroup()
+
+# plot
+freq_genes_enr <- ggplot(top_genes, aes(x = reorder(gene, count), y = count)) +
+  geom_col(fill= "firebrick") +
+  coord_flip() +
+  facet_wrap(~pair, scales = "free_y", ncol = 1) +
+  theme_minimal(base_size = 14) +
+  labs(
+    x =  element_blank(),
+    y = "Frequency"
+    #title = "Most frequent genes across GO enrichments for module pairs"
+  )
+freq_genes_enr
+
+#Save histograms
+ggsave(filename = file.path(output_dir, "freq_genes_enr.pdf"),
+       plot = freq_genes_enr,
+       width = 4,
+       height = 10)
+
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(dplyr)
+library(purrr)
+library(VennDiagram)
+library(grid)
+
+# función para correr GO enrichment
+run_go <- function(genes) {
+  
+  if(length(genes) < 3) return(NULL)
+  
+  ego <- enrichGO(
+    gene = genes,
+    OrgDb = org.Hs.eg.db,
+    keyType = "ENSEMBL",
+    ont = "BP",
+    pAdjustMethod = "BH",
+    pvalueCutoff = 0.05,
+    qvalueCutoff = 0.2,
+    readable = TRUE
+  )
+  
+  if(is.null(ego) || nrow(ego@result) == 0) return(NULL)
+  
+  ego
+}
+
+pair_enrichments <- pair_genes_sets %>%
+  rowwise() %>%
+  mutate(
+    
+    enrich_intersection = list(run_go(Genes_intersection)),
+    enrich_unique_1 = list(run_go(Genes_unique_1)),
+    enrich_unique_2 = list(run_go(Genes_unique_2))
+    
+  ) %>%
+  ungroup()
+
+extract_genes <- function(enrich_obj){
+  
+  if(is.null(enrich_obj)) return(character(0))
+  
+  genes <- enrich_obj@result$geneID %>%
+    strsplit("/") %>%
+    unlist() %>%
+    unique()
+  
+  return(genes)
+}
+
+pair_enrichments <- pair_enrichments %>%
+  rowwise() %>%
+  mutate(
+    
+    genes_enrich_intersection = list(extract_genes(enrich_intersection)),
+    genes_enrich_unique_1 = list(extract_genes(enrich_unique_1)),
+    genes_enrich_unique_2 = list(extract_genes(enrich_unique_2))
+    
+  ) %>%
+  ungroup()
+
+venn_list <- list(
+  Intersection = pair_enrichments$genes_enrich_intersection[[1]],
+  Unique_Module1 = pair_enrichments$genes_enrich_unique_1[[1]],
+  Unique_Module2 = pair_enrichments$genes_enrich_unique_2[[1]]
+)
+
+venn.plot <- venn.diagram(
+  x = venn_list,
+  filename = NULL,
+  fill = c("tomato", "skyblue", "seagreen"),
+  alpha = 0.5,
+  cex = 1.5,
+  cat.cex = 1.2
+)
+
+grid.draw(venn.plot)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1207,5 +1379,11 @@ ggsave(
   width = 14,
   height = 12,
   dpi = 300)
+
+###########
+
+
+
+
 
 #What

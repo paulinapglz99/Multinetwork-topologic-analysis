@@ -25,7 +25,8 @@ globals$Phenotype <- sub("^.*_counts_([^_]+).*", "\\1", globals$network)
 globals$Phenotype <- factor(globals$Phenotype, levels = c("control", "AD"))
 globals$Network <- paste0(globals$Region, " ", globals$Phenotype) 
 globals <- globals %>%  select(where(~ !all(is.na(.x))))
-#globals <-globals %>% filter(!perc_random_50)
+globals <-globals %>% filter(!perc_random_50)
+
 #Fix column name for global clustering
 colnames(globals)[11] <- "global_clustering"
 colnames(globals)[13] <-"degree_mean"
@@ -35,7 +36,6 @@ colnames(globals)[15] <- "degree_sd"
 colnames(globals)
 
 #Define metrics
-#metric_cols <- colnames(globals)[2:20]
 metric_labels <- c(
   n_nodes                 = "Number of nodes",
   avg_path_len            = "Average path length",
@@ -51,11 +51,21 @@ metric_labels <- c(
   degree_median           = "Median degree",
   kcore_max               = "Maximum k-core",
   Q_modularity             = "Modularity (Q)",
-  perc_targeted_50        = "Targeted attack (50%)",
+  #perc_targeted_50        = "Targeted attack (50%)",
   n_communities           = "Number of communities",
   largest_community_size  = "Largest community size"
 )
 
+metric_cols <- colnames(globals)[2:20]
+
+cat("Columnas 2 a 20:\n")
+print(colnames(globals)[2:20])
+
+cat("\nClaves en metric_labels:\n")
+print(names(metric_labels))
+
+cat("\nCoincidencias:\n")
+print(intersect(colnames(globals)[2:20], names(metric_labels)))
 
 #Compute means per group
 means <- globals %>%

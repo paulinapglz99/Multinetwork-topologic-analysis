@@ -1,360 +1,275 @@
 #!/usr/bin/env Rscript
-#plots_global.R
-#Generate topological network metric plots and heatmaps
-#This script needs the output of topological_analysis.R
+# =============================================================================
+# plots_global.R
+# Generate topological network metric plots and heatmaps
+# Requires: output of topological_analysis.R (networks_summary.csv)
+# =============================================================================
 
-#Load packages
-if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman", repos = "https://cloud.r-project.org")
+# -----------------------------------------------------------------------------
+# 0. Dependencies
+# -----------------------------------------------------------------------------
+
+if (!requireNamespace("pacman",   quietly = TRUE)) install.packages("pacman",   repos = "https://cloud.r-project.org")
 if (!requireNamespace("optparse", quietly = TRUE)) install.packages("optparse", repos = "https://cloud.r-project.org")
 
 pacman::p_load(
-  igraph, data.table, 
+  igraph, data.table,
   ggplot2, tidyverse,
   optparse, tools, purrr,
-  ggpubr, broom, pheatmap, 
+  ggpubr, broom, pheatmap,
   vroom, ggrepel, cowplot,
-  ggdendro,patchwork
+  ggdendro, patchwork
 )
 
-#Get data
+# -----------------------------------------------------------------------------
+# 1. Load & tidy data
+# -----------------------------------------------------------------------------
+
 globals <- vroom::vroom("~/Desktop/local_work/fomo_networks/results_topos_louvain/networks_summary.csv")
 
-#Parse region and phenotype names from network IDs
-globals$Region <- sub("^(Mayo_|ROSMAP_)", "", sub("_counts_.*", "", globals$network))
+# Parse region and phenotype from network IDs
+globals$Region    <- sub("^(Mayo_|ROSMAP_)", "", sub("_counts_.*", "", globals$network))
 globals$Phenotype <- sub("^.*_counts_([^_]+).*", "\\1", globals$network)
 globals$Phenotype <- factor(globals$Phenotype, levels = c("control", "AD"))
-globals$Network <- paste0(globals$Region, " ", globals$Phenotype) 
-globals <- globals %>%  select(where(~ !all(is.na(.x))))
-globals <-globals %>% filter(!perc_random_50)
+globals$Network   <- paste0(globals$Region, " ", globals$Phenotype)
 
-#Fix column name for global clustering
-colnames(globals)[11] <- "global_clustering"
-colnames(globals)[13] <-"degree_mean"
-colnames(globals)[14] <- "degree_median"
-colnames(globals)[15] <- "degree_sd"
+# Drop all-NA columns
+globals <- globals %>% select(where(~ !all(is.na(.x))))
 
+# Fix column names (must happen BEFORE defining metric_cols)
 colnames(globals)
+# [1] "file"                   "n_nodes"                "n_edges"                "avg_path_len"           "diameter"              
+# [6] "global_density"         "size_giant_component"   "frac_giant_component"   "n_components"           "clustering_local_mean" 
+# [11] "clustering_global"      "assortativity"          "deg_mean"               "deg_median"             "deg_sd"                
+# [16] "kcore_max"              "Q_modularity"           "perc_targeted_50"       "perc_random_50"         "n_communities"         
+# [21] "largest_community_size" "largest_community_id"   "network"                "Region"                 "Phenotype"             
+# [26] "Network"    
 
-#Define metrics
-metric_labels <- c(
-  n_nodes                 = "Number of nodes",
-  avg_path_len            = "Average path length",
-  diameter                = "Diameter",
-  global_density          = "Global density",
-  size_giant_component    = "Giant component size",
-  frac_giant_component    = "Fraction of giant component",
-  n_components            = "Number of components",
-  clustering_local_mean   = "Mean local clustering",
-  global_clustering       = "Global clustering",
-  assortativity           = "Assortativity",
-  degree_mean             = "Mean degree",
-  degree_median           = "Median degree",
-  kcore_max               = "Maximum k-core",
-  Q_modularity             = "Modularity (Q)",
-  #perc_targeted_50        = "Targeted attack (50%)",
-  n_communities           = "Number of communities",
-  largest_community_size  = "Largest community size"
+# globals <- globals %>%
+#   dplyr::rename(
+#     global_clustering = clustering_global,
+#     degree_mean = deg_mean,
+#     degree_median = deg_median,
+#     degree_sd = deg_sd
+#   )
+
+# -----------------------------------------------------------------------------
+# 2. Define metrics
+# -----------------------------------------------------------------------------
+
+metric_cols <- c(
+  "n_nodes", "n_edges", "avg_path_len", "diameter",
+  "global_density", "size_giant_component", "frac_giant_component",
+  "n_components", "clustering_local_mean", "clustering_global",
+  "assortativity", "deg_mean", "deg_median", "deg_sd",
+  "kcore_max", "Q_modularity", "perc_targeted_50",
+  "n_communities", "largest_community_size"
 )
 
-metric_cols <- colnames(globals)[2:20]
+length(metric_cols)
 
-cat("Columnas 2 a 20:\n")
-print(colnames(globals)[2:20])
+metric_labels <- c(
+  n_nodes                = "Number of nodes",
+  avg_path_len           = "Average path length",
+  diameter               = "Diameter",
+  global_density         = "Global density",
+  size_giant_component   = "Giant component size",
+  frac_giant_component   = "Fraction of giant component",
+  n_components           = "Number of components",
+  clustering_local_mean  = "Mean local clustering",
+  clustering_global      = "Global clustering",
+  assortativity          = "Assortativity",
+  deg_mean               = "Mean degree",
+  deg_median             = "Median degree",
+  deg_sd                 = "SD degree",
+  kcore_max              = "Maximum k-core",
+  Q_modularity           = "Modularity (Q)",
+  perc_targeted_50       = "Targeted attack (50%)",
+  n_communities          = "Number of communities",
+  largest_community_size = "Largest community size"
+)
 
-cat("\nClaves en metric_labels:\n")
-print(names(metric_labels))
+# -----------------------------------------------------------------------------
+# 3. Compute AD – control differences per region
+# -----------------------------------------------------------------------------
 
-cat("\nCoincidencias:\n")
-print(intersect(colnames(globals)[2:20], names(metric_labels)))
-
-#Compute means per group
 means <- globals %>%
   group_by(Region, Phenotype) %>%
   summarise(across(all_of(metric_cols), mean, na.rm = TRUE), .groups = "drop")
 
 means_wide <- means %>%
   pivot_wider(
-    names_from = Phenotype,
+    names_from  = Phenotype,
     values_from = where(is.numeric),
-    names_sep = "_")
+    names_sep   = "_"
+  )
 
-#Compute differences (AD - control)
 diffs <- means_wide %>%
-  mutate(across(ends_with("_AD"),
-                ~ . - get(sub("_AD$", "_control", cur_column())),
-                .names = "diff_{.col}")) %>%
+  mutate(across(
+    ends_with("_AD"),
+    ~ . - get(sub("_AD$", "_control", cur_column())),
+    .names = "diff_{.col}"
+  )) %>%
   select(Region, starts_with("diff_"))
 
-#Hierarchical clustering of differences
-
-diffs_mat <- diffs %>%
+# Log-transform signed differences for visualisation
+diffs <- diffs %>%
   column_to_rownames("Region") %>%
   as.matrix()
 
-diffs_mat_log <- sign(diffs_mat) * log10(abs(diffs_mat) + 1)
-dist_mat <- dist(diffs_mat_log)
-hc_diff <- hclust(dist_mat, method = "ward.D2")
-region_order <- hc_diff$labels[hc_diff$order]
+diffs_mat_log <- sign(diffs) * log10(abs(diffs) + 1)
 
-#Prepare data for ggplot
-diffs_long <- diffs %>%
-  pivot_longer(-Region, names_to = "Metric", values_to = "Difference") %>%
-  mutate(
-    Difference_log = sign(Difference) * log10(abs(Difference) + 1),
-    Metric_name = Metric %>%
-      str_remove_all("diff_|_AD") %>%
-      str_replace_all("_", " ") %>%
-      str_to_title(),
-    Region = factor(Region, levels = region_order)
-  )
-
-#Plot pheatmap
+# Clean up column names for display
 colnames(diffs_mat_log) <- colnames(diffs_mat_log) %>%
   gsub("diff_|_AD", "", .) %>%
   gsub("_", " ", .) %>%
   tools::toTitleCase()
 
-heatmap_global<- grid::grid.grabExpr({
+# Hierarchical clustering of regions by their difference profiles
+dist_mat  <- dist(diffs_mat_log)
+hc_diff   <- hclust(dist_mat, method = "ward.D2")
+region_order <- hc_diff$labels[hc_diff$order]
+
+# -----------------------------------------------------------------------------
+# 4. Heatmap A – global metric differences (AD vs control)
+# -----------------------------------------------------------------------------
+
+heatmap_global <- grid::grid.grabExpr({
   pheatmap(
     diffs_mat_log,
-    color = colorRampPalette(c("firebrick4", "gray93", "cornflowerblue"))(100),
+    color        = colorRampPalette(c("firebrick4", "gray93", "cornflowerblue"))(100),
     cluster_rows = TRUE,
     cluster_cols = TRUE,
-    scale = "none",
+    scale        = "none",
     border_color = "white",
-    fontsize = 20,
-    main = " "
+    fontsize     = 20,
+    main         = " "
   )
 })
 
-#Vis
-heatmap_global
-
-#Save plot
-# ggsave("heatmap_global_diffs.jpeg",
-#        plot = heatmap_global,
-#        device = "jpeg",
-#        width = 15,
-#        height = 10,
-#        units = "in",
-#        dpi = 300
-# )
-
-#Save plot
-# ggsave("heatmap_global_diffs.pdf",
-#        plot = heatmap_global,
-#        device = "pdf",
-#        width = 15,
-#        height = 10,
-#        units = "in",
-#        dpi = 300
-# )
-
-############PLOT CORRELATIONS##############
-#See if certain metrics are co-varying
+# -----------------------------------------------------------------------------
+# 5. Correlation heatmap between network metrics
+# -----------------------------------------------------------------------------
 
 cor_mat <- cor(globals %>% select(all_of(metric_cols)), use = "pairwise.complete.obs")
 
-cor_mat.p <- pheatmap(cor_mat,
-         color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
-         main = "Correlation between Network Metrics")
+cor_mat.p <- pheatmap(
+  cor_mat,
+  color = colorRampPalette(c("navy", "white", "firebrick3"))(100),
+  main  = "Correlation between Network Metrics"
+)
+cor_mat.p
 
-# #Save plot
-# ggsave("cor_mat_metrics.jpeg",
-#        plot = cor_mat.p,
-#        device = "jpeg",
-#        width = 10,
-#        height = 10,
-#        units = "in",
-#        dpi = 300
-# )
-# 
-# #Save plot
-# ggsave("cor_mat_metrics.pdf",
-#        plot = cor_mat.p,
-#        device = "pdf",
-#        width = 10,
-#        height = 10,
-#        units = "in",
-#        dpi = 300
-# )
+# -----------------------------------------------------------------------------
+# 6. PCA of network metrics
+# -----------------------------------------------------------------------------
 
-############PCA of regions by metrics################
+# Remove zero-variance columns before PCA
+globals_metrics <- globals %>%
+  select(all_of(metric_cols)) %>%
+  select(where(~ var(.x, na.rm = TRUE) > 0 & !all(is.na(.x))))
 
-globals_metrics <- globals %>% select(all_of(metric_cols))
-
-#PCA
 pca_res <- prcomp(globals_metrics, center = TRUE, scale. = TRUE)
 
-#Score df
+# Scores
 pca_df <- as.data.frame(pca_res$x) %>%
-  mutate(Region = globals$Region,
-         Phenotype = globals$Phenotype)
+  mutate(
+    Region    = globals$Region,
+    Phenotype = globals$Phenotype
+  )
 
-#variance
+# Variance explained
 var_exp <- (pca_res$sdev^2 / sum(pca_res$sdev^2)) * 100
-pc1 <- round(var_exp[1], 1)
-pc2 <- round(var_exp[2], 1)
+pc1_var <- round(var_exp[1], 1)
+pc2_var <- round(var_exp[2], 1)
 
-#See contribution scores
-#Get loadings
-loadings_res <- pca_res$rotation
-
-#Contribution scores per component
-contrib_PC1 <- abs(loadings_res[, 1]) / sum(abs(loadings_res[, 1]))
-contrib_PC2 <- abs(loadings_res[, 2]) / sum(abs(loadings_res[, 2]))
-
-#Plot PCA
-safe_ellipse <- function(...) {
-  tryCatch(stat_ellipse(...), error = function(e) NULL)
-}
-pca.p <- ggplot(pca_df, aes(x = PC1, y = PC2,
-                          color = Phenotype,
-                          label = Region)) +
+pca.p <- ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) +
   geom_point(size = 4) +
   geom_text_repel(size = 3.5, show.legend = FALSE) +
   scale_color_manual(values = c("control" = "cornflowerblue", "AD" = "red4")) +
   labs(
     title = " ",
-    x = paste0("PC1 (", pc1, "% var)"),
-    y = paste0("PC2 (", pc2, "% var)")
+    x     = paste0("PC1 (", pc1_var, "% var)"),
+    y     = paste0("PC2 (", pc2_var, "% var)")
   ) +
   theme_cowplot() +
-  #stat_ellipse(aes(group = Region), level = 0.95, geom = "polygon", alpha = 0.2) +
   theme(
-    legend.position = "top",
-    plot.title = element_text(hjust = 0.5)
+    legend.position  = "top",
+    plot.title       = element_text(hjust = 0.5)
   )
 
 #Vis
 pca.p
 
-#Save plot
-# ggsave("pca-globals-louvain.jpeg",
-#        plot = pca.p,
-#        device = "jpeg",
-#        width = 5,
-#        height = 5,
-#        units = "in",
-#        dpi = 300
-# )
-# 
-# #Save plot
-# ggsave("pca-globals-louvain.pdf",
-#        plot = pca.p,
-#        device = "pdf",
-#        width = 5,
-#        height = 5,
-#        units = "in",
-#        dpi = 300
-# )
-
-#Contribution to PCs
-
+# Variable contributions to PC1 and PC2
 contrib <- sweep(pca_res$rotation^2, 2, colSums(pca_res$rotation^2), FUN = "/") * 100
 
-contrib.df <- as.data.frame(contrib[, 1:2]) %>% 
-  rownames_to_column("variable") %>% 
+# Use only metrics that survived the zero-variance filter
+surviving_metrics <- colnames(globals_metrics)
+valid_labels      <- metric_labels[names(metric_labels) %in% surviving_metrics]
+
+contrib.df <- as.data.frame(contrib[, 1:2]) %>%
+  rownames_to_column("variable") %>%
   pivot_longer(
-    cols = starts_with("PC"),
-    names_to = "PC",
+    cols      = starts_with("PC"),
+    names_to  = "PC",
     values_to = "contribution"
-  ) %>% 
+  ) %>%
   mutate(variable = factor(
     variable,
-    levels = metric_cols,
-    labels = metric_labels[metric_cols]
+    levels = surviving_metrics,
+    labels = valid_labels[surviving_metrics]
   )) %>%
   group_by(PC) %>%
   arrange(desc(contribution), .by_group = TRUE) %>%
-  mutate(variable = factor(variable, levels = variable)) %>%
+  mutate(variable = factor(variable, levels = unique(variable))) %>%
   ungroup()
 
-contrib.p <- ggplot(contrib.df,
-       aes(x = variable, y = contribution, fill = PC)) +
+contrib.p <- ggplot(contrib.df, aes(x = variable, y = contribution, fill = PC)) +
   geom_col(show.legend = TRUE) +
   coord_flip() +
   facet_wrap(~ PC, scales = "free_y") +
-  scale_fill_manual(
-    values = c(
-      "PC1" = "#1446A0",
-      "PC2" = "#7d1538"
-    )
-  ) +
+  scale_fill_manual(values = c("PC1" = "#1446A0", "PC2" = "#7d1538")) +
   labs(
-    x = "Variable",
-    y = "Contribution (%)",
+    x     = "Variable",
+    y     = "Contribution (%)",
     title = "Variable contributions to PC1 and PC2"
   ) +
   theme_cowplot()
 
-#Vis
-
 contrib.p
 
-#Save plot
+# # -----------------------------------------------------------------------------
+# 7. Euclidean distance matrix
+# # -----------------------------------------------------------------------------
 
-ggsave("contributions_pca.jpeg",
-       plot = contrib.p,
-       device = "jpeg",
-       width = 15,
-       height = 13,
-       units = "in",
-       dpi = 300
-)
-
-ggsave("contributions_pca.pdf",
-       plot = contrib.p,
-       device = "pdf",
-       width = 15,
-       height = 13,
-       units = "in",
-       dpi = 300
-)
-
-
-############PCA of euclidean distance matrix ################
-
-#Summary of global features
 globals_summary <- globals %>%
   group_by(Region, Phenotype) %>%
   summarise(across(all_of(metric_cols), mean, na.rm = TRUE), .groups = "drop") %>%
   unite("Network", Region, Phenotype, sep = " ") %>%
   column_to_rownames("Network") %>%
-  scale()  # Escala z-score por métrica
+  select(where(~ var(.x, na.rm = TRUE) > 0 & !all(is.na(.x)))) %>%  # remove zero-var cols
+  scale()
 
-#Euclidean distance matrix
-dist_matrix <- globals_summary %>%
- # column_to_rownames("Network") %>%
-  dist(method = "euclidean") %>%
-  as.matrix()
+dist_matrix <- dist(globals_summary, method = "euclidean") %>% as.matrix()
 
-#Distance matrix clustering
+# Hierarchical clustering of the distance matrix
 hc_dist <- hclust(dist(dist_matrix), method = "ward.D2")
-ord <- hc_dist$order
-
-#How many clusters?
-k <- 4
-clusters <- cutree(hc_dist, k = k)
-# calcular cambios de cluster
+ord     <- hc_dist$order
+k       <- 4
+clusters      <- cutree(hc_dist, k = k)
 cluster_order <- clusters[ord]
-#Distance matrix ordered
+
 dist_reordered <- dist_matrix[ord, ord]
 
-#Dendrogram of distance matrix
+# Dendrogram
 dendro <- ggdendrogram(hc_dist, rotate = TRUE, theme_dendro = FALSE) +
   theme_cowplot() +
   labs(title = "", x = "", y = "")
 
-#Vis
-dendro
-
-#Hetamap of matrix distance 
-
-#Get separation lines
+# Heatmap of distance matrix
 breaks <- which(diff(cluster_order) != 0)
 
-#Distance matrix in long format
 dist_long <- as.data.frame(dist_reordered) %>%
   rownames_to_column("Network1") %>%
   pivot_longer(-Network1, names_to = "Network2", values_to = "Distance") %>%
@@ -364,209 +279,151 @@ dist_long <- as.data.frame(dist_reordered) %>%
   ) %>%
   filter(as.integer(Network1) <= as.integer(Network2))
 
-#Plot heatmap
-
 heatmap_dist <- ggplot(dist_long, aes(Network1, Network2, fill = Distance)) +
   geom_tile() +
   scale_fill_viridis_c(
     guide = guide_colorbar(
-      position = "top",
-      barheight = unit(10, "pt"),    
-      barwidth  = unit(140, "pt"),  
+      position      = "top",
+      barheight     = unit(10,  "pt"),
+      barwidth      = unit(140, "pt"),
       title.position = "top"
     )
   ) +
   coord_fixed() +
-  geom_hline(yintercept = breaks + 0.5, color = "black", size = 0.7) +
-  geom_vline(xintercept = breaks + 0.5, color = "black", size = 0.7) +
+  geom_hline(yintercept = breaks + 0.5, color = "black", linewidth = 0.7) +
+  geom_vline(xintercept = breaks + 0.5, color = "black", linewidth = 0.7) +
   theme_minimal() +
   theme(
-    panel.grid = element_blank(),
-    axis.text.x = element_text(angle = 90, hjust = 1, size =15),
-    axis.text.y = element_text(size = 15),
-    legend.position = "top",
-    legend.title = element_text(size = 15),
-    legend.text  = element_text(size = 15)
+    panel.grid    = element_blank(),
+    axis.text.x   = element_text(angle = 90, hjust = 1, size = 15),
+    axis.text.y   = element_text(size = 15),
+    legend.position     = "top",
+    legend.title        = element_text(size = 15),
+    legend.text         = element_text(size = 15)
   ) +
   labs(title = " ", x = "", y = "")
 
-#Vis
+#vis
+
 heatmap_dist
-# 
-#Convert the matrix distance into a pca object
-pca_dist <- prcomp(dist_matrix, center = TRUE, scale. = TRUE)
 
-#Get scores and plot
-pca_df <- as.data.frame(pca_dist$x) %>%
-  rownames_to_column("RegionPhenotype") %>%
-  separate(RegionPhenotype, into = c("Region", "Phenotype"), sep = " ")
-var_exp <- (pca_dist$sdev^2 / sum(pca_dist$sdev^2)) * 100
-pc1 <- round(var_exp[1], 1)
-pc2 <- round(var_exp[2], 1)
+# -----------------------------------------------------------------------------
+# 7b. Intra- vs inter-region distance summary
+# -----------------------------------------------------------------------------
 
-#See contribution scores
-#Get loadings
-loadings <- pca_dist$rotation
-
-#Contribution scores per component
-contrib_PC1 <- abs(loadings[, 1]) / sum(abs(loadings[, 1]))
-contrib_PC2 <- abs(loadings[, 2]) / sum(abs(loadings[, 2]))
-
-#Plot
-pca_dist.p <-ggplot(pca_df, aes(x = PC1, y = PC2, color = Phenotype, label = Region)) +
-  geom_point(size = 3.8, alpha = 0.9) +
-  geom_text_repel(size = 3, max.overlaps = 10, box.padding = 0.3, point.padding = 0.2,
-                  show.legend = FALSE) +
-  scale_color_manual(
-    values = c("control" = "cornflowerblue", "AD" = "red4"),
-    name = "Group"
-  ) +
-  labs(
-    title = "",
-    x = paste0("PC1 (", pc1, "% var)"),
-    y = paste0("PC2 (", pc2, "% var)")
-  ) +
-  theme_cowplot() +
-  theme(
-    legend.position = "top",
-    legend.title = element_text(size = 10),
-    legend.text  = element_text(size = 9),
-    plot.title   = element_text(hjust = 0.5),
-    axis.title   = element_text(size = 11),
-    axis.text    = element_text(size = 9)
+dist_df <- as.data.frame(as.matrix(dist_matrix)) %>%
+  rownames_to_column("Net1") %>%
+  pivot_longer(-Net1, names_to = "Net2", values_to = "Distance") %>%
+  filter(Net1 != Net2) %>%
+  mutate(
+    Region1   = str_extract(Net1, "^[^ ]+"),
+    Region2   = str_extract(Net2, "^[^ ]+"),
+    pair_type = if_else(Region1 == Region2, "intra_region", "inter_region")
   )
 
-#Vis
-pca_dist.p
+dist_summary <- dist_df %>%
+  group_by(pair_type) %>%
+  summarise(
+    mean = mean(Distance),
+    min  = min(Distance),
+    max  = max(Distance),
+    sd   = sd(Distance),
+    median = median(Distance),
+    .groups = "drop"
+  )
 
-##### FINAL GRID ####
+print(dist_summary)
 
-library(cowplot)
+ratio_mean <- dist_summary$mean[dist_summary$pair_type == "intra_region"] /
+  dist_summary$mean[dist_summary$pair_type == "inter_region"]
 
-#PanelA+B
+cat(sprintf("\nIntra/inter-region mean distance ratio: %.3f\n", ratio_mean))
+cat(sprintf("Interpretation: intra-region pairs are on average %.2fx %s than inter-region pairs\n",
+            ratio_mean,
+            if_else(ratio_mean < 1, "more similar (anatomical identity dominates)", "more dissimilar")))
 
+# -----------------------------------------------------------------------------
+# 8. Per-metric line plots
+# -----------------------------------------------------------------------------
+
+# make_metric_plot <- function(df, metric, ylab) {
+#   ggplot(df, aes(
+#     x      = as.factor(Region),
+#     y      = .data[[metric]],
+#     color  = Phenotype,
+#     group  = Phenotype
+#   )) +
+#     geom_line(linewidth = 0.8, alpha = 0.8) +
+#     geom_point(size = 2.5) +
+#     labs(title = " ", x = "", y = ylab) +
+#     scale_color_manual(values = c("control" = "cornflowerblue", "AD" = "red4")) +
+#     scale_y_continuous(limits = c(0, max(df[[metric]], na.rm = TRUE))) +
+#     theme_light() +
+#     theme(
+#       legend.position = "none",
+#       panel.spacing   = unit(0.2, "lines"),
+#       plot.margin     = margin(1, 1, 1, 1, "mm"),
+#       axis.text.x     = element_text(angle = 90, vjust = 0.5, hjust = 1)
+#     )
+# }
+# 
+# plot_specs <- data.frame(
+#   var  = metric_cols,
+#   ylab = colnames(diffs_mat_log),
+#   stringsAsFactors = FALSE
+# )
+# 
+# metric_plots <- map2(
+#   plot_specs$var,
+#   plot_specs$ylab,
+#   ~ make_metric_plot(globals, .x, .y)
+# )
+# 
+# metric_grid <- cowplot::plot_grid(plotlist = metric_plots, ncol = 2)
+# 
+# #Vis
+# 
+# metric_grid
+
+# -----------------------------------------------------------------------------
+# 9. Assemble final figures
+# -----------------------------------------------------------------------------
+
+# Figure 1: distance heatmap + metrics PCA
 top_panel <- plot_grid(
   heatmap_dist,
   pca.p,
-  labels = c("A", "B"),
+  labels     = c("A", "B"),
   label_size = 14,
-  ncol = 2,
-  rel_widths = c(1, 1))
-top_panel
-
-#Midd panel
-middle_panel <- plot_grid(
-  heatmap_global,
-  jaccard_global_connect,
-  labels =  c("C", "D"),
-  label_size = 14,
-  ncol = 2
-)
-middle_panel
-
-#Finally
-final_plot <- plot_grid(
-  top_panel,
-  middle_panel,
-  ncol = 1#,
-  #rel_heights = c(1.8, 1,   1.6)
+  ncol       = 2,
+  rel_widths = c(1, 1)
 )
 
-#Vis
-final_plot
+# Figure 2: differences heatmap + global connectivity (jaccard_global_connect must exist)
+# middle_panel <- plot_grid(
+#   heatmap_global,
+#   jaccard_global_connect,
+#   labels     = c("C", "D"),
+#   label_size = 14,
+#   ncol       = 2
+# )
 
-#Save
-ggsave(
-  "final_global_figure.jpeg",
-  plot = final_plot,
-  width = 16,
-  height = 18,
-  dpi = 300)
-#Save
-ggsave(
-  "final_global_figure.pdf",
-  plot = final_plot,
-  width = 14,
-  height = 16,
-  dpi = 300)
+# Final composite
+# final_plot <- plot_grid(top_panel, middle_panel, ncol = 1)
 
-############PLOT ALL METRICS ##############
+# -----------------------------------------------------------------------------
+# 10. Save outputs
+# -----------------------------------------------------------------------------
 
-#Function to plot metrics
-make_metric_plot <- function(df, metric, title, ylab) {
-  ggplot(df, aes(
-    x = as.factor(Region),
-    y = .data[[metric]],
-    color = Phenotype,
-    group = Phenotype 
-  )) +
-    # geom_segment(aes(
-    #   xend = as.factor(Region),
-    #   y = 0, yend = .data[[metric]]
-    # ), size = 0.8) +
-    geom_line(linewidth = 0.8, alpha = 0.8) +
-    geom_point(size = 2.5) +
-    #facet_wrap(~Phenotype, scales = "free_y", ncol = 2) +
-    labs(title = " ", x = "", y = ylab) +
-    scale_color_manual(values = c("control" = "cornflowerblue", "AD" = "red4")) +
-    scale_y_continuous(limits = c(0, max(df[[metric]]))) +
-    theme_light() +
-    theme(
-      legend.position = "none",
-      panel.spacing = unit(0.2, "lines"),
-      plot.margin = margin(1, 1, 1, 1, "mm"),
-      axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
-    )
-}
+ggsave("contributions_pca.jpeg",     contrib.p,   width = 15, height = 13, dpi = 300)
+ggsave("contributions_pca.pdf",      contrib.p,   width = 15, height = 13, dpi = 300)
+ggsave("pca_metrics.jpeg",           pca.p,       width =  5, height =  5, dpi = 300)
+ggsave("pca_metrics.pdf",            pca.p,       width =  5, height =  5, dpi = 300)
+ggsave("metric_plots_grid.jpeg",     metric_grid, width = 12, height = 18, dpi = 300)
+ggsave("metric_plots_grid.pdf",      metric_grid, width = 12, height = 15, dpi = 300)
+ggsave("final_global_figure.jpeg",   top_panel,   width = 16, height =  9, dpi = 300)
+ggsave("final_global_figure.pdf",    top_panel,   width = 16, height =  9, dpi = 300)
 
-#Define plot specifications
-plot_specs <- data.frame(
-  var = metric_cols,
-  ylab = colnames(diffs_mat_log),
-  stringsAsFactors = FALSE
-)
-
-#Generate lollipop plots
-plots <- map2(plot_specs$var, seq_along(plot_specs$var), function(varname, idx) {
-  make_metric_plot(globals, varname, plot_specs$ylab[idx], plot_specs$ylab[idx])
-})
-
-#Grid plots
-x <-cowplot::plot_grid(plotlist = plots, ncol = 2)
-#Vis
-x
-
-#Save plots
-# ggsave("2-global_metrics_lollipop.pdf", x, width = 12, height = 15, units = "in", dpi = 300)
-# ggsave("3-global_metrics_lollipop.jpeg", x, width = 12, height = 18, units = "in", dpi = 300)
-
-#Final grand plot
-right_panel <- cowplot::plot_grid(
-  heatmap_global,
-  pca,
-  ncol = 1,
-  labels = c(" ", "C"),
-  rel_heights = c(1.2, 1)
-)
-right_panel
-
-grand <- cowplot::plot_grid(
-  x,              
-  right_panel,
-  labels = c("A", "B"),
-  label_size = 14,
-  ncol = 2,
-  rel_widths = c(1.5, 1)
-)
-
-#Vis
-grand
-
-#Save plot
-ggsave("1-grand_global_metrics-pres.jpeg", grand, 
-       width = 18, 
-       height = 17,
-       units = "in",
-       dpi = 300)
-
-#END
+# =============================================================================
+# END
+# =============================================================================

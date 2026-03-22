@@ -91,7 +91,7 @@ option_list <- list(
 opt <- parse_args(OptionParser(option_list = option_list))
 opt$out_dir <- "~/Desktop/local_work/fomo_networks/results_wide_hubs"
 dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
-opt$input_dir <- "~/Desktop/local_work/fomo_networks/fomo_networks/"
+opt$input_dir <- "~/Desktop/local_work/fomo_networks/results_topos_louvain/"
 opt$pattern <- "\\.tsv$"
 
 setwd(opt$out_dir)
@@ -103,7 +103,7 @@ convert_ens_to_symbol <- function(ensembl_ids) {
         values = ensembl_ids,
         mart = mart)
 }
-files <- list.files(input_dir, pattern = "_nodes_summary.csv$", full.names = TRUE)
+files <- list.files(opt$input_dir, pattern = "_nodes_summary.csv$", full.names = TRUE)
 #Get data
 node_data <- map_df(files, function(file) {
   df <- vroom::vroom(file)

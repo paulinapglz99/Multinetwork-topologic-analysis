@@ -2,7 +2,9 @@
 
 # community_enrichment.R
 
-#Package management
+############################
+# Package management
+############################
 
 if (!requireNamespace("pacman", quietly = FALSE))
   install.packages("pacman", repos = "https://cloud.r-project.org")
@@ -40,7 +42,9 @@ if (!all(ok)) {
 
 message("All packages loaded correctly.")
 
-#Parser
+############################
+# Command line options
+############################
 
 option_list <- list(
   optparse::make_option(
@@ -65,7 +69,8 @@ option_list <- list(
     type="integer",
     default=42,
     help="Seed"
-  ))
+  )
+)
 
 opt <- optparse::parse_args(
   optparse::OptionParser(option_list = option_list)
@@ -78,13 +83,17 @@ dir.create(opt$out_dir, showWarnings = FALSE, recursive = TRUE)
 
 set.seed(opt$seed)
 
-#Ontologies to evaluate
+############################
+# Ontologies to evaluate
+############################
 
 ontologies <- c("BP", "MF")
 
-#Enrichment function
+############################
+# Enrichment functions
+############################
 
-enricher_fun <- function(nodes, network_universe, ontology) {
+enricher_go_fun <- function(nodes, network_universe, ontology) {
   enrichGO(
     gene = nodes,
     OrgDb = org.Hs.eg.db,
@@ -94,6 +103,56 @@ enricher_fun <- function(nodes, network_universe, ontology) {
     ont = ontology,
     pvalueCutoff = 0.05,
     qvalueCutoff = 0.10
+  )
+}
+
+enricher_kegg_fun <- function(nodes, network_universe) {
+  
+  # Convert ENSEMBL to ENTREZID for KEGG
+  gene_mapping <- tryCatch(
+    bitr(
+      nodes,
+      fromType = "ENSEMBL",
+      toType = "ENTREZID",
+      OrgDb = org.Hs.eg.db
+    ),
+    error = function(e) {
+      message("Error converting ENSEMBL to ENTREZID: ", e$message)
+      return(NULL)
+    }
+  )
+  
+  if (is.null(gene_mapping) || nrow(gene_mapping) == 0) {
+    return(NULL)
+  }
+  
+  entrez_genes <- gene_mapping$ENTREZID
+  
+  # Convert universe to ENTREZID
+  universe_mapping <- tryCatch(
+    bitr(
+      network_universe,
+      fromType = "ENSEMBL",
+      toType = "ENTREZID",
+      OrgDb = org.Hs.eg.db
+    ),
+    error = function(e) NULL
+  )
+  
+  entrez_universe <- if (!is.null(universe_mapping)) {
+    universe_mapping$ENTREZID
+  } else {
+    NULL
+  }
+  
+  # KEGG enrichment
+  enrichKEGG(
+    gene = entrez_genes,
+    organism = "hsa",
+    universe = entrez_universe,
+    pvalueCutoff = 0.05,
+    qvalueCutoff = 0.10,
+    use_internal_data = FALSE
   )
 }
 
@@ -134,10 +193,11 @@ process_network <- function(row) {
     # robustness: skip very small communities
     if (length(nodes) < 5) return(NULL)
     
-    ont_list <- lapply(ontologies, function(ont) {
+    # GO enrichment
+    go_list <- lapply(ontologies, function(ont) {
       
       res <- tryCatch(
-        enricher_fun(nodes, network_universe, ont),
+        enricher_go_fun(nodes, network_universe, ont),
         error = function(e) NULL
       )
       
@@ -149,11 +209,36 @@ process_network <- function(row) {
       
       df$CommunityID <- community_id
       df$Ontology <- ont
+      df$Database <- "GO"
       
       return(df)
     })
     
-    data.table::rbindlist(ont_list, fill = TRUE)
+    # KEGG enrichment
+    kegg_res <- tryCatch(
+      enricher_kegg_fun(nodes, network_universe),
+      error = function(e) {
+        message("KEGG enrichment failed for community ", community_id, ": ", e$message)
+        return(NULL)
+      }
+    )
+    
+    kegg_df <- NULL
+    if (!is.null(kegg_res)) {
+      kegg_df <- as.data.frame(kegg_res)
+      
+      if (nrow(kegg_df) > 0) {
+        kegg_df$CommunityID <- community_id
+        kegg_df$Ontology <- "KEGG"
+        kegg_df$Database <- "KEGG"
+      } else {
+        kegg_df <- NULL
+      }
+    }
+    
+    # Combine all results
+    all_results <- c(go_list, list(kegg_df))
+    data.table::rbindlist(all_results, fill = TRUE)
   })
   
   final_summary <- data.table::rbindlist(enriched_list, fill = TRUE)
@@ -168,7 +253,9 @@ process_network <- function(row) {
   return(out_file)
 }
 
-#Parallel execution
+############################
+# Parallel execution
+############################
 
 index_df <- fread(opt$index_file)
 

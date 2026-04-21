@@ -35,7 +35,7 @@ low_thres    <- 0.2
 min_genes    <- 3
 
 # --- Region order ---
-ordered_regions <- c("HCN", "PCC", "TC", "DLPFC", "CRB")
+ordered_regions <- c("HCN", "DLPFC", "PCC", "CRB", "TC")
 
 # ==============================================================================
 # 1. HELPER FUNCTIONS
@@ -401,7 +401,8 @@ summary_all <- classified_all |>
   dplyr::mutate(
     local_proportion  = round(n_modules / N_modules * 100, 1),
     global_proportion = round(n_modules / Total_region_modules * 100, 1)
-  )
+  ) %>% 
+  dplyr::mutate(Region = factor(Region, levels = ordered_regions))
 
 # vroom::vroom_write(summary_all, file.path(output_dir, "modules_classification_summary.csv"))
 
@@ -552,15 +553,15 @@ p_module_ridges <- ggplot(module_sizes_annot,
 # 6B. NMI heatmap
 p_nmi <- nmi_results |>
   dplyr::arrange(NMI) |>
-  dplyr::mutate(Region = factor(Region, levels = unique(Region))) |>
+  dplyr::mutate(Region = factor(Region, levels = ordered_regions)) |>
   ggplot(aes(x = "AD vs Control", y = Region, fill = NMI)) +
   geom_tile(color = "white") +
   geom_text(aes(label = round(NMI, 3)), size = 4) +
-  scale_fill_gradient(low = aaas_cols[1], high = aaas_cols[2]) +
+  scale_fill_gradient(low = aaas_cols[1], high = "#8EAACC") +
   labs(title = "NMI", x = "", y = "") +
-  theme_minimal(base_size = 14) +
+  theme_minimal(base_size = 12) +
   theme(
-    plot.title    = element_text(face = "bold", hjust = 0.5),
+    plot.title    = element_text(hjust = 0.5),
     axis.text.x   = element_blank(),
     axis.ticks.x  = element_blank(),
     panel.grid    = element_blank(),
@@ -572,7 +573,7 @@ p_mean_jaccard <- jaccards_tb |>
   dplyr::group_by(Region) |>
   dplyr::summarise(mean_jaccard = mean(Jaccard_Index, na.rm = TRUE), .groups = "drop") |>
   dplyr::arrange(mean_jaccard) |>
-  dplyr::mutate(Region = factor(Region, levels = unique(Region))) |>
+  dplyr::mutate(Region = factor(Region, levels = ordered_regions)) |>
   ggplot(aes(x = "", y = Region, fill = mean_jaccard)) +
   geom_tile(color = "white") +
   geom_text(aes(label = round(mean_jaccard, 3)), size = 4) +
@@ -620,8 +621,14 @@ p_jaccard_panel <- cowplot::plot_grid(
 p_local <- ggplot(summary_all, aes(x = Region, y = local_proportion, fill = Classification)) +
   geom_bar(stat = "identity", position = "stack", color = "white", linewidth = 0.3) +
   facet_wrap(~Phenotype) +
-  scale_fill_manual(values = fill_colors) +
-  labs(title = "Local proportion", y = "%", x = "") +
+  scale_fill_manual(values = fill_colors,
+                    labels = c(
+                      "AD_exclusive"      = "AD exclusive",
+                      "Control_exclusive" = "Control exclusive",
+                      "Intermediate"      = "Intermediate",
+                      "Similar"           = "Similar"
+                    )) +
+  labs(title =  element_blank(), y = "%", x = "") +
   theme_minimal(base_size = 13) +
   theme(panel.grid = element_blank())
 
@@ -661,13 +668,12 @@ p_freq_genes <- purrr::imap_dfr(go_by_pair, function(ego, pair_name) {
 # ==============================================================================
 
 panel_counts <- cowplot::plot_grid(
-  p_module_ridges, p_nmi,
-  labels     = c("A", "B"),
-  rel_widths = c(2, 1),
+  p_module_ridges, p_nmi, p_local,
+  labels     = c("A", "B", "C"),
+  rel_widths = c(2, 0.8, 2.5),
   label_size = 14,
-  ncol       = 2
+  ncol       = 3
 )
-
 # Dunn post-hoc bubble plot (across regions, per phenotype)
 # Each bubble is one region pair; size = -log10(p.adj); color = significance.
 # Only pairs with p.adj < 0.05 get a filled bubble so non-significant pairs
@@ -940,10 +946,9 @@ save_plot <- function(plot, filename, width, height) {
   ggsave(file.path(output_dir, paste0(filename, ".jpeg")), plot = plot, width = width, height = height, dpi = 300)
 }
 
-save_plot(panel_counts,    "panel_module_counts",    width = 10, height = 8)
+save_plot(panel_counts, "panel_module_counts",width = 14, height = 14)
 save_plot(p_dunn_bubble, "module_size_dunn",        width = 10, height = 5)
 save_plot(p_jaccard_panel, "jaccard_histogram",      width = 18, height = 10)
-save_plot(p_proportions,   "proportions_modules",    width = 13, height = 7)
 save_plot(p_freq_genes,    "freq_genes_enrichment",  width = 4,  height = 10)
 if (!is.null(panel_cnet)) save_plot(panel_cnet, "cnet_conserved_pairs", width = 14, height = 8)
 

@@ -273,21 +273,34 @@ compute_degree_dist <- function(net_path) {
     names(which.max(pvals))
   }, error = function(e) NA_character_)
   
-  data.table(
-    network   = meta$name,
-    region    = meta$region,
-    phenotype = meta$phenotype,
-    threshold = thr,
-    gamma     = gamma_val,
-    best_fit  = best_dist
+  # Return both summary and raw degree table
+  list(
+    summary = data.table(
+      network   = meta$name,
+      region    = meta$region,
+      phenotype = meta$phenotype,
+      threshold = thr,
+      gamma     = gamma_val,
+      best_fit  = best_dist
+    ),
+    raw = deg_table %>%
+      mutate(
+        network   = meta$name,
+        region    = meta$region,
+        phenotype = meta$phenotype,
+        threshold = thr,
+        gamma     = gamma_val
+      )
   )
 }
 
 deg_results <- future_lapply(cut_files, compute_degree_dist, future.seed = opt$seed)
-deg_dt <- rbindlist(deg_results, fill = TRUE)
+deg_dt <- rbindlist(lapply(deg_results, `[[`, "summary"), fill = TRUE)
+deg_raw <- rbindlist(lapply(deg_results, `[[`, "raw"), fill = TRUE)
 
 fwrite(deg_dt, file.path(opt$out_dir, "degree_dists", "sensitivity_degree_summary.csv"))
-message("Degree distribution summary saved.")
+fwrite(deg_raw, file.path(opt$out_dir, "degree_dists", "sensitivity_degree_raw.csv"))
+message("Degree distribution summary and raw data saved.")
 
 # --- 6. Step 4: Generate Rmarkdown report ------------------------------------
 
@@ -324,6 +337,7 @@ pacman::p_load(data.table, ggplot2, dplyr, tidyr, ggsci, ggpubr,
 ```{r load_data}
 topo <- fread("topology/sensitivity_topology.csv")
 deg  <- fread("degree_dists/sensitivity_degree_summary.csv")
+deg_raw <- fread("degree_dists/sensitivity_degree_raw.csv")
 
 # Create labels
 topo <- topo %>%
@@ -332,6 +346,11 @@ topo <- topo %>%
     threshold_k = threshold / 1000
   )
 deg <- deg %>%
+  mutate(
+    net_label = paste(region, phenotype, sep = " "),
+    threshold_k = threshold / 1000
+  )
+deg_raw <- deg_raw %>%
   mutate(
     net_label = paste(region, phenotype, sep = " "),
     threshold_k = threshold / 1000
@@ -622,17 +641,46 @@ ggplot(corr_summary, aes(x = threshold_k, y = spearman_rho,
   theme(legend.position = "right", legend.text = element_text(size = 7))
 ```
 
-# 4. Degree distribution summary
+# 4. Degree distributions
 
-```{r deg_table}
-kable(
-  deg %>%
-    dplyr::select(network, region, phenotype, threshold_k, gamma, best_fit) %>%
-    arrange(region, phenotype, threshold_k),
-  caption = "Degree distribution: gamma exponent and best-fit model across thresholds",
-  digits = 3
-)
+## 4.1 Log-log degree distributions per network
+
+Each panel shows one network (region + phenotype). Within each panel, each
+threshold is a separate colour. The dashed line is the linear fit in log-log space
+whose slope gives the $\\gamma$ exponent shown in the annotation. If the slopes
+are parallel across thresholds within each panel, the shape of the degree
+distribution is preserved regardless of the pruning cutoff.
+
+```{r degdist_loglog, fig.height=20, fig.width=14}
+# Build gamma annotation labels
+gamma_labels <- deg_raw %>%
+  group_by(net_label, threshold_k) %>%
+  summarise(gamma = unique(gamma), .groups = "drop") %>%
+  group_by(net_label) %>%
+  summarise(
+    label = paste(paste0(threshold_k, "K: g=", round(gamma, 2)), collapse = "\n"),
+    .groups = "drop"
+  )
+
+ggplot(deg_raw, aes(x = degree, y = prob,
+                     color = factor(threshold_k))) +
+  geom_point(alpha = 0.5, size = 1) +
+  geom_smooth(method = "lm", se = FALSE, linetype = "dashed", linewidth = 0.6) +
+  scale_x_log10() +
+  scale_y_log10() +
+  facet_wrap(~ net_label, scales = "free", ncol = 2) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = expression(log[10](k)),
+       y = expression(log[10](P(k))),
+       title = "Degree distributions in log-log space across edge thresholds",
+       subtitle = "Dashed lines: linear fit (slope = -gamma). Parallel slopes = stable shape.",
+       color = "Threshold (K)") +
+  theme_pubclean(base_size = 11) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(face = "bold", size = 10))
 ```
+
+## 4.2 Gamma exponent across thresholds
 
 ```{r gamma_plot, fig.height=6}
 ggplot(deg, aes(x = threshold_k, y = gamma, color = net_label, group = net_label)) +
@@ -645,6 +693,18 @@ ggplot(deg, aes(x = threshold_k, y = gamma, color = net_label, group = net_label
        color = "Network") +
   theme_pubclean(base_size = 13) +
   theme(legend.position = "right")
+```
+
+## 4.3 Summary tables
+
+```{r deg_table}
+kable(
+  deg %>%
+    dplyr::select(network, region, phenotype, threshold_k, gamma, best_fit) %>%
+    arrange(region, phenotype, threshold_k),
+  caption = "Degree distribution: gamma exponent and best-fit model across thresholds",
+  digits = 3
+)
 ```
 
 ```{r bestfit_table}

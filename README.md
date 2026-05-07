@@ -14,8 +14,7 @@ Raw expression and metadata were obtained from the following AMP-AD cohorts, ava
 | Cohort | Brain regions | Access |
 |--------|--------------|--------|
 | ROSMAP | DLPFC | Synapse: [syn3388564](https://www.synapse.org/#!Synapse:syn3388564) |
-| Mayo Clinic | TCX, CRB | Synapse: [syn5550404](https://www.synapse.org/#!Synapse:syn5550404) |
-| MSSMseq (ARSyn) | PCC, PHG | Synapse: [syn3157743](https://www.synapse.org/#!Synapse:syn3157743) |
+| Mayo Clinic | TC, CRB | Synapse: [syn5550404](https://www.synapse.org/#!Synapse:syn5550404) |
 
 > Raw data are not included in this repository. Access requires registration at the AD Knowledge Portal.
 
@@ -50,15 +49,14 @@ Cohort-specific scripts that normalize and filter expression matrices, retain sa
 | Script | Cohort |
 |--------|--------|
 | `2.pre-pro-mRNA_ROSMAP.R` | ROSMAP (DLPFC) |
-| `2.pre-pro-mRNA_Mayo.R` | Mayo (TCX, CRB) |
-| `2.pre-pro-mRNA_ARSyn.R` | MSSMseq (PCC, PHG) |
+| `2.pre-pro-mRNA_Mayo.R` | Mayo (TC, CRB) |
 
 ### 01 — Network construction
 
 | Script | Description |
 |--------|-------------|
-| `cut_networks.R` | Filters ARACNe networks by mutual information threshold |
-| `cut_networks_n.R` | Variant with normalized MI threshold |
+| `cut_networks.R` | Filters networks by mutual information threshold |
+| `cut_networks_n.R` | Variant with n-based MI threshold |
 | `translate_graphs.R` | Converts Ensembl IDs to gene symbols across network files |
 | `generate_test_data.R` | Generates synthetic edge lists for pipeline testing |
 

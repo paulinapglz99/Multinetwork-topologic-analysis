@@ -70,6 +70,7 @@ Run with: `bash/run_cut.sh`, `bash/run_translate.sh`
 | `degree_distributions.R` | Degree distribution fitting and plots |
 | `edge_threshold_sensitivity.R` | Sensitivity analysis across MI thresholds |
 | `null_distributions.R` | Null model generation for metric comparison |
+| `centrality_comparison_AD_vs_control.R` | Per-gene degree, PageRank, and betweenness in paired AD/control networks; percentile-rank deltas and Spearman correlation per region |
 
 Run with: `bash/run_topos.sh`, `bash/run_degree.sh`, `bash/run_edge_threshold_s.sh`, `bash/run_null_dis.sh`
 
@@ -121,6 +122,10 @@ Run with: `bash/run_comm_enr.sh`, `bash/run_comm_enr_2net.sh`
 | `metadata_demographics.R` | Summarizes cohort demographics and CERAD score distributions |
 | `explore_DEGS.R` | Differential expression analysis and overlap with network hubs |
 | `module_expression_summary.R` | Computes module eigengenes and correlates them with clinical variables |
+| `prepare_metadata.R` | Harmonizes sample metadata (region, sex) across cohorts |
+| `dge_limma_AD_vs_control.R` | limma-trend differential expression (AD vs. control, sex-adjusted) per region |
+| `gsea_reactome.R` | GSEA on limma t-statistics against Reactome gene sets; exports full, significant, and top terms per region |
+| `dge_degree_integration.R` | Joins differential expression with degree percentile changes per region |
 
 Run with: `bash/run_module_expression_summary.sh`
 
@@ -130,8 +135,15 @@ Run with: `bash/run_module_expression_summary.sh`
 |--------|-------------|
 | `3.plots_global.R` | Plots global topological metrics across regions and phenotypes |
 | `raw_jaccard_matrices.R` | Plots Jaccard similarity heatmaps across network pairs |
+| `degree_AD_vs_control_panels.R` | Gene-overlap barplot plus per-region degree scatterplots (AD vs. control) with Spearman rho |
+| `volcano_by_region.R` | Volcano plots of AD vs. control differential expression, one row per region |
+| `gsea_heatmap.R` | NES heatmap of top Reactome terms per region with FDR stars |
+| `dge_gsea_panel.R` | Composite figure combining the volcano rows and the GSEA heatmap |
+| `dge_degree_scatter.R` | log2 fold-change vs. degree percentile change for differentially expressed genes across regions |
 
 Run with: `bash/run_jaccard.sh`
+
+Visualization scripts read from `results/` and write figures (PDF and PNG) to `results/figures/`.
 
 ---
 
@@ -144,11 +156,13 @@ Run with: `bash/run_jaccard.sh`
 install.packages(c(
   "igraph", "tidyverse", "ggplot2", "ggsci",
   "future.apply", "optparse", "data.table",
-  "jsonlite", "stringr", "rmarkdown"
+  "jsonlite", "stringr", "rmarkdown",
+  "vroom", "ggrepel", "patchwork", "cowplot", "msigdbr"
 ))
 
 # Bioconductor
-BiocManager::install(c("clusterProfiler", "org.Hs.eg.db", "DESeq2"))
+BiocManager::install(c("clusterProfiler", "org.Hs.eg.db", "DESeq2",
+                       "limma", "biomaRt"))
 ```
 
 ---

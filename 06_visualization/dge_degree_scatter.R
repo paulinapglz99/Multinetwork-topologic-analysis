@@ -14,9 +14,11 @@ suppressPackageStartupMessages({
 
 options(stringsAsFactors = FALSE)
 
-# ===================== CONFIG ===================== #
-in_dir  <- "results/dge_degree"
-out_dir <- "results/figures"
+# ===================== CONFIG (repo-relative; run from the repository root) ===================== #
+source("config/paths.R")
+
+in_dir  <- file.path(OUTPUTS_DIR, "dge_degree")
+out_dir <- PLOTS_DIR  # this script's ggsave output is the final Figure S3
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 TOP_PCT <- 0.10
@@ -231,9 +233,9 @@ p <- ggplot() +
   )
 
 # ===================== SAVE ===================== #
-ggsave(file.path(out_dir, "DGE_degree_scatter.png"),
+ggsave(file.path(out_dir, "FigureS3_DGE_degree_scatter.png"),
        p, width = 12.5, height = 7.5, dpi = 300)
-ggsave(file.path(out_dir, "DGE_degree_scatter.pdf"),
+ggsave(file.path(out_dir, "FigureS3_DGE_degree_scatter.pdf"),
        p, width = 12.5, height = 7.5)
 
 saveRDS(label_df, file.path(in_dir, "DGE_degree_top10_labeled_genes.rds"))

@@ -1,6 +1,8 @@
-Rscript ~/Desktop/local_work/Multinetwork-topologic-analysis/null_distributions.R \
--i ~/Desktop/local_work/Multinetwork-topologic-analysis/test_data/graphmls/ \
--o ~/Desktop/local_work/Multinetwork-topologic-analysis/test_data/resultados_null/ \
--w 4 \
---make_html
-
+#!/usr/bin/env bash
+# Run from the repository root: bash bash/run_null_dis.sh
+# Null-model comparison on the small synthetic test networks.
+Rscript 02_topology/null_distributions.R \
+  -i test_data/graphmls/ \
+  -o test_data/outputs/null_dist/ \
+  -w 4 \
+  --make_html

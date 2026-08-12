@@ -12,12 +12,14 @@ suppressPackageStartupMessages({
 
 options(stringsAsFactors = FALSE)
 
-# ===================== CONFIG ===================== #
-in_dir  <- "data/expression"
-out_dir <- "results/dge_limma"
+# ===================== CONFIG (repo-relative; run from the repository root) ===================== #
+source("config/paths.R")
+
+in_dir  <- file.path(INPUTS_DIR, "expression_matrices")
+out_dir <- file.path(OUTPUTS_DIR, "dge_limma")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-metadata <- readRDS("results/metadata_sex.rds")
+metadata <- readRDS(file.path(OUTPUTS_DIR, "metadata_sex.rds"))
 
 # Reporting thresholds (used only for summary; full tables are always saved)
 PADJ_CUT   <- 0.05

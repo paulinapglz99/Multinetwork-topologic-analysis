@@ -15,9 +15,13 @@ suppressPackageStartupMessages({
 
 options(stringsAsFactors = FALSE)
 
-# ===================== CONFIG ===================== #
-in_dir  <- "results/dge_limma"
-out_dir <- "results/figures"
+# ===================== CONFIG (repo-relative; run from the repository root) ===================== #
+# NOTE: this is an intermediate component consumed by dge_gsea_panel.R (Figure 6),
+# not a final manuscript figure itself, so it stays under outputs/, not plots/.
+source("config/paths.R")
+
+in_dir  <- file.path(OUTPUTS_DIR, "dge_limma")
+out_dir <- file.path(OUTPUTS_DIR, "figures")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 FDR_CUT <- 0.05

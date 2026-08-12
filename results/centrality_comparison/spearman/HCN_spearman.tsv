@@ -1,4 +1,0 @@
-network	centrality	n_common_genes	spearman_rho	spearman_pvalue
-HCN	degree	3361	0.8078947047584499	0
-HCN	pagerank	3361	0.799091599864734	0
-HCN	betweenness	3361	0.6468942965820449	0

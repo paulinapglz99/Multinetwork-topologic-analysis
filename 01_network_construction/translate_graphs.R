@@ -116,11 +116,6 @@ option_list <- list(
 opt_parser <- OptionParser(option_list = option_list)
 opt <- parse_args(opt_parser)
 
-opt$input_dir <- "/STORAGE/csbig/networks_final/fomo_networks"
-opt$output_dir <- "/STORAGE/csbig/networks_final/fomo_networks/translated_graphs"
-opt$pattern <- "\\.tsv$"
-opt$type <- "edgelist"
-
 # Output folder
 if (!dir.exists(opt$output_dir))
   dir.create(opt$output_dir, recursive = TRUE)

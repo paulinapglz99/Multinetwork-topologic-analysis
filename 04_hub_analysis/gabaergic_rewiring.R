@@ -19,10 +19,14 @@ pacman::p_load(
 
 # ── 1. Paths ──────────────────────────────────────────────────────────────────
 
-network_dir <- "~/Desktop/local_work/fomo_networks/translated_graphs"
-out_dir     <- "~/Desktop/local_work/fomo_networks/results/gabaergic_neighborhood"
-setwd(out_dir)
+source("config/paths.R")
+
+# NOTE: translated (gene-symbol) graphml networks (~105 MB) are not copied
+# into this repo by default — place them in inputs/graphs/ before running.
+network_dir <- file.path(INPUTS_DIR, "graphs")
+out_dir     <- file.path(OUTPUTS_DIR, "gabaergic_neighborhood")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+setwd(out_dir)
 
 # Cohort prefix per region (as observed in your filenames)
 cohort_map <- c(DLPFC = "ROSMAP", HCN = "ROSMAP", PCC = "ROSMAP",

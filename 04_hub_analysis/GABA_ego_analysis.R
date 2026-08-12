@@ -109,8 +109,14 @@ message(glue::glue("Total GABAergic seed genes: {length(all_gabaergic)}"))
 #   networks/DLPFC_AD.tsv, networks/DLPFC_control.tsv, ...
 # Columns: Regulator, Target, MI (or similar weight column)
 
-network_dir <- "~/Desktop/local_work/fomo_networks/"    # ← CHANGE THIS
-out_dir     <- "~/Desktop/local_work/fomo_networks/results/gabaergic"
+source("config/paths.R")
+
+# NOTE: this script expects files named "{region}_{phenotype}.tsv" (e.g.
+# DLPFC_AD.tsv), but inputs/networks/ currently holds files named like
+# ROSMAP_DLPFC_counts_AD_topN200000.tsv — the naming mismatch predates this
+# path fix and needs to be reconciled separately before this script will run.
+network_dir <- file.path(INPUTS_DIR, "networks")
+out_dir     <- file.path(OUTPUTS_DIR, "gabaergic")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 regions    <- c("DLPFC", "HCN", "PCC", "TC", "CRB")

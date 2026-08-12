@@ -1,6 +1,9 @@
-Rscript ~/Desktop/local_work/Multinetwork-topologic-analysis/degree_distributions.R \
--i ~/Desktop/local_work/fomo_networks \
--p ".*\\.tsv$" \
--o ~/Desktop/local_work/fomo_networks/prueba_grado_fixing \
--w 2 \
---make_html TRUE
+#!/usr/bin/env bash
+# Run from the repository root: bash bash/run_degree.sh
+# Degree distribution fitting on the real filtered networks (inputs/networks/).
+Rscript 02_topology/degree_distributions.R \
+  -i inputs/networks \
+  -p ".*\\.tsv$" \
+  -o outputs/degree_distributions \
+  -w 2 \
+  --make_html TRUE

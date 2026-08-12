@@ -1,4 +1,0 @@
-network	centrality	n_common_genes	spearman_rho	spearman_pvalue
-DLPFC	degree	4039	0.7854871196870497	0
-DLPFC	pagerank	4039	0.7390101470055762	0
-DLPFC	betweenness	4039	0.6232490494372203	0

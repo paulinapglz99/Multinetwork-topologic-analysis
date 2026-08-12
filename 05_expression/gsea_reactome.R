@@ -9,9 +9,11 @@ suppressPackageStartupMessages({
   library(msigdbr)
 })
 
-# ===================== CONFIG ===================== #
-in_dir  <- "results/dge_limma"
-out_dir <- "results/gsea_reactome"
+# ===================== CONFIG (repo-relative; run from the repository root) ===================== #
+source("config/paths.R")
+
+in_dir  <- file.path(OUTPUTS_DIR, "dge_limma")
+out_dir <- file.path(OUTPUTS_DIR, "gsea_reactome")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 pattern_in <- "_limma_AD_vs_Control_allGenes\\.tsv$"

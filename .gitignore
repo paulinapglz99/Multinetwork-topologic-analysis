@@ -1,3 +1,13 @@
-*.pdf
-*.png
-*.rds
+# Real pipeline data (external, too large / access-controlled to version).
+# Populate locally per README.md; see config/paths.R for the expected layout.
+/inputs/
+/outputs/
+
+# R artifacts
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# OS/editor cruft
+.DS_Store

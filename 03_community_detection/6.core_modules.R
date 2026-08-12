@@ -20,10 +20,12 @@ pacman::p_load(
   "ggpubr"        # for stat_compare_means() annotation
 )
 
-# --- Paths (hardcoded for development) ---
-input_dir  <- "~/Desktop/local_work/fomo_networks/results_topos_louvain"
-output_dir <- "~/Desktop/local_work/fomo_networks/results_core_modules"
-enrich_dir <- "~/Desktop/local_work/fomo_networks/results_topos_louvain/results_comm/"
+# --- Paths (repo-relative; run from the repository root) ---
+source("config/paths.R")
+
+input_dir  <- file.path(INPUTS_DIR, "topology")
+output_dir <- file.path(OUTPUTS_DIR, "core_modules")
+enrich_dir <- file.path(INPUTS_DIR, "enrichment")
 pattern    <- "_nodes_summary\\.csv$"
 
 dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
@@ -909,7 +911,7 @@ plot_cnet <- function(tg, pair_title, pair_subtitle,
 # --- Build the two panels ---
 
 # Pair A: AD synaptic pair — 3 genes, compact inner/outer radii
-tg_ad <- prepare_cnet_tg(cnet_networks[["PCC_AD_25__DLPFC_AD_14"]], top_n_go = 15)
+tg_ad <- prepare_cnet_tg(cnet_networks[["DLPFC_AD_14__PCC_AD_25"]], top_n_go = 15)
 p_cnet_ad <- plot_cnet(
   tg_ad,
   pair_title    = "PCC AD 25 -- DLPFC AD 14",
@@ -920,7 +922,7 @@ p_cnet_ad <- plot_cnet(
 )
 
 # Pair B: Control immune pair — many genes, larger outer radius to avoid crowding
-tg_ctrl <- prepare_cnet_tg(cnet_networks[["PCC_Control_2__DLPFC_Control_3"]], top_n_go = 13)
+tg_ctrl <- prepare_cnet_tg(cnet_networks[["DLPFC_Control_3__PCC_Control_2"]], top_n_go = 13)
 p_cnet_ctrl <- plot_cnet(
   tg_ctrl,
   pair_title    = "PCC Control 2 -- DLPFC Control 3",
@@ -940,16 +942,16 @@ panel_cnet <- cowplot::plot_grid(
   rel_widths = c(1, 1.6)   # Control panel wider — more nodes
 )
 
-# Save panels
+# Save panels (final figures go to plots/, not output_dir)
 save_plot <- function(plot, filename, width, height) {
-  ggsave(file.path(output_dir, paste0(filename, ".pdf")),  plot = plot, width = width, height = height, dpi = 300)
-  ggsave(file.path(output_dir, paste0(filename, ".jpeg")), plot = plot, width = width, height = height, dpi = 300)
+  ggsave(file.path(PLOTS_DIR, paste0(filename, ".pdf")),  plot = plot, width = width, height = height, dpi = 300)
+  ggsave(file.path(PLOTS_DIR, paste0(filename, ".jpeg")), plot = plot, width = width, height = height, dpi = 300)
 }
 
-save_plot(panel_counts, "panel_module_counts",width = 14, height = 14)
+save_plot(panel_counts, "Figure2_panel_module_counts", width = 14, height = 14)
 save_plot(p_dunn_bubble, "module_size_dunn",        width = 10, height = 5)
-save_plot(p_jaccard_panel, "jaccard_histogram",      width = 18, height = 10)
+save_plot(p_jaccard_panel, "FigureS2_jaccard_histogram", width = 18, height = 10)
 save_plot(p_freq_genes,    "freq_genes_enrichment",  width = 4,  height = 10)
-if (!is.null(panel_cnet)) save_plot(panel_cnet, "cnet_conserved_pairs", width = 14, height = 8)
+if (!is.null(panel_cnet)) save_plot(panel_cnet, "Figure3_cnet_conserved_pairs", width = 14, height = 8)
 
-message("Done! All outputs saved to: ", output_dir)
+message("Done! Data outputs saved to: ", output_dir, " | Figures saved to: ", PLOTS_DIR)

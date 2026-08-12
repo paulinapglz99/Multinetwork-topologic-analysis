@@ -1,3 +1,7 @@
+# Exploratory scratch script — not part of the reproducible pipeline.
+# Reads every file under a local DEGS/ folder (external, not included in this
+# repo) with vroom::vroom(), which will error on non-tabular files. Kept for
+# reference only; needs a real DEGS directory path below to run.
 pacman::p_load("vroom", "tidyverse")
 
 setwd("~/Desktop/local_work/fomo_networks/DEGS/")

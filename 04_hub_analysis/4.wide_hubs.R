@@ -43,11 +43,13 @@ option_list <- list(
 
 opt <- parse_args(OptionParser(option_list = option_list))
 
-# --- Hardcoded values (comment out when using CLI) ---
-opt$input_dir   <- "~/Desktop/local_work/fomo_networks/results_topos_louvain/"
-opt$enrich_dir  <- "~/Desktop/local_work/fomo_networks/results_topos_louvain/results_comm/"
-opt$out_dir     <- "~/Desktop/local_work/fomo_networks/results_wide_hubs"
-opt$limma_dir   <- "~/Desktop/local_work/fomo_networks/DEGS"
+# --- Repo-relative defaults (run from the repository root; comment out when using CLI) ---
+source("config/paths.R")
+
+opt$input_dir   <- file.path(INPUTS_DIR, "topology")
+opt$enrich_dir  <- file.path(INPUTS_DIR, "enrichment")
+opt$out_dir     <- file.path(OUTPUTS_DIR, "wide_hubs")
+opt$limma_dir   <- file.path(INPUTS_DIR, "DEGS")
 opt$min_regions <- 2L
 # ------------------------------------------------------
 
@@ -322,12 +324,12 @@ enrich_CTR <- run_enrichment(wide_CTR$symbol, label = "CTR-exclusive hubs")
 
 if (nrow(as.data.frame(enrich_AD)) > 0) {
   cnet_AD <- cnetplot(enrich_AD, node_label_size = NULL)
-  ggsave("cnetplot_AD_hubs.jpeg", plot = cnet_AD, width = 10, height = 10)
+  ggsave(file.path(PLOTS_DIR, "cnetplot_AD_hubs.jpeg"), plot = cnet_AD, width = 10, height = 10)
 }
 
 if (nrow(as.data.frame(enrich_CTR)) > 0) {
   cnet_CTR <- cnetplot(enrich_CTR, node_label_size = NULL)
-  ggsave("cnetplot_CTR_hubs.jpeg", plot = cnet_CTR, width = 10, height = 10)
+  ggsave(file.path(PLOTS_DIR, "cnetplot_CTR_hubs.jpeg"), plot = cnet_CTR, width = 10, height = 10)
 }
 
 # -----------------------------------------------------------------------------
@@ -467,7 +469,7 @@ hub_deg_tile <- hub_deg_status %>%
     legend.position = "right"
   )
 
-ggsave("AD_hubs_deg_heatmap.jpeg", plot = hub_deg_tile, width = 5, height = 6, dpi = 300)
+ggsave(file.path(PLOTS_DIR, "AD_hubs_deg_heatmap.jpeg"), plot = hub_deg_tile, width = 5, height = 6, dpi = 300)
 
 # -----------------------------------------------------------------------------
 # 9. LogFC heatmaps with hub borders + single shared legend
@@ -515,7 +517,8 @@ hts_fc <- cowplot::plot_grid(
   rel_widths = c(1, 0.08)
 )
 
-ggsave("hub_heatmaps_logfc.jpeg", plot = hts_fc, width = 12, height = 8, dpi = 300)
+ggsave(file.path(PLOTS_DIR, "Figure4_hub_heatmaps_logfc.jpeg"), plot = hts_fc, width = 12, height = 8, dpi = 300)
+ggsave(file.path(PLOTS_DIR, "Figure4_hub_heatmaps_logfc.pdf"),  plot = hts_fc, width = 12, height = 8, dpi = 300)
 
 message("Done! All outputs saved to: ", opt$out_dir)
 

@@ -23,13 +23,15 @@ pacman::p_load(
 )
 
 # -----------------------------------------------------------------------------
-# 1. Paths (edit here)
+# 1. Paths (repo-relative; run from the repository root)
 # -----------------------------------------------------------------------------
 
-SUMMARY_CSV  <- "~/Desktop/local_work/fomo_networks/results_topos_louvain/networks_summary.csv"
-NETWORKS_DIR <- "~/Desktop/local_work/fomo_networks/"
+source("config/paths.R")
+
+SUMMARY_CSV  <- file.path(INPUTS_DIR, "topology", "networks_summary.csv")
+NETWORKS_DIR <- file.path(INPUTS_DIR, "networks")
 NET_PATTERN  <- "\\.tsv$"
-OUT_DIR      <- "~/Desktop/local_work/fomo_networks/plots"
+OUT_DIR      <- PLOTS_DIR
 
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 setwd(OUT_DIR)
@@ -383,8 +385,8 @@ final_plot
 # 10. Save outputs
 # -----------------------------------------------------------------------------
 
-ggsave("contributions_pca.jpeg",   contrib.p,   width = 15, height = 13, dpi = 300)
-ggsave("contributions_pca.pdf",    contrib.p,   width = 15, height = 13, dpi = 300)
+ggsave("FigureS1_contributions_pca.jpeg", contrib.p, width = 15, height = 13, dpi = 300)
+ggsave("FigureS1_contributions_pca.pdf",  contrib.p, width = 15, height = 13, dpi = 300)
 
 ggsave("pca_metrics.jpeg",         pca.p,       width =  5, height =  5, dpi = 300)
 ggsave("pca_metrics.pdf",          pca.p,       width =  5, height =  5, dpi = 300)
@@ -392,8 +394,8 @@ ggsave("pca_metrics.pdf",          pca.p,       width =  5, height =  5, dpi = 3
 ggsave("jaccard_connectivity.jpeg", jaccard_global_connect, width = 5, height = 5, dpi = 300)
 ggsave("jaccard_connectivity.pdf",  jaccard_global_connect, width = 5, height = 5, dpi = 300)
 
-ggsave("final_global_figure.jpeg", final_plot,  width = 16, height = 14, dpi = 300)
-ggsave("final_global_figure.pdf",  final_plot,  width = 16, height = 14, dpi = 300)
+ggsave("Figure1_final_global_figure.jpeg", final_plot, width = 16, height = 14, dpi = 300)
+ggsave("Figure1_final_global_figure.pdf",  final_plot, width = 16, height = 14, dpi = 300)
 
 # =============================================================================
 # END

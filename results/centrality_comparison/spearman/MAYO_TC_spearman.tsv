@@ -1,0 +1,4 @@
+network	centrality	n_common_genes	spearman_rho	spearman_pvalue
+MAYO_TC	degree	2498	0.7123557144985416	0
+MAYO_TC	pagerank	2498	0.641969442050988	2.9066924129526404e-290
+MAYO_TC	betweenness	2498	0.4620131129172672	2.5132370232821218e-132

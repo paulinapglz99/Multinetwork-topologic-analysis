@@ -1,0 +1,4 @@
+network	centrality	n_common_genes	spearman_rho	spearman_pvalue
+PCC	degree	3753	0.8417906095713961	0
+PCC	pagerank	3753	0.7991735564108168	0
+PCC	betweenness	3753	0.669487752593388	0

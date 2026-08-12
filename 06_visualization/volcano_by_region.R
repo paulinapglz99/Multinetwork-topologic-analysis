@@ -24,7 +24,6 @@ FDR_CUT <- 0.05
 LFC_CUT <- 0.5
 TOP_N_PER_SIDE <- 7
 
-USE_FDR_ON_X <- TRUE  # TRUE: -log10(adj.P.Val); FALSE: -log10(P.Value)
 P_FLOOR <- 1e-300
 
 out_png <- file.path(out_dir, "volcano_by_region_AD_vs_control.png")
@@ -88,9 +87,7 @@ all_df <- all_df %>%
   mutate(
     gene_clean = sub("\\..*$", "", gene),
 
-    p_for_x    = if (USE_FDR_ON_X) adj.P.Val else P.Value,
-    p_for_x    = pmax(p_for_x, P_FLOOR),
-    x_sig      = -log10(p_for_x),
+    x_sig      = -log10(pmax(adj.P.Val, P_FLOOR)),
     y_fc       = as.numeric(logFC),
 
     pass_fdr   = adj.P.Val <= FDR_CUT,

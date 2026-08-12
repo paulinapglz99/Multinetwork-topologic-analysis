@@ -173,9 +173,6 @@ Run with: `bash/run_module_expression_summary.sh`
 
 Run with: `bash/run_jaccard.sh`
 
-Visualization scripts read intermediates from `outputs/` and write final figures to `plots/`;
-intermediate components (volcano, GSEA heatmap) stay under `outputs/figures/`.
-
 ---
 
 ## Figures
@@ -196,12 +193,8 @@ unprefixed.
 | Fig. S2 | `FigureS2_jaccard_histogram.jpeg` | `03_community_detection/6.core_modules.R` |
 | Fig. S3 | `FigureS3_DGE_degree_scatter.{png,pdf}` | `06_visualization/dge_degree_scatter.R` |
 
-Figs. 5, 6 and S3 are assembled from intermediates under `outputs/`. Run the analysis stages
-first: `02_topology/centrality_comparison_AD_vs_control.R` (Fig. 5, S3), then
-`05_expression/prepare_metadata.R`, `dge_limma_AD_vs_control.R`, `gsea_reactome.R` (Fig. 6)
-and `dge_degree_integration.R` (Fig. S3). Fig. 6 additionally requires
-`06_visualization/volcano_by_region.R` and `06_visualization/gsea_heatmap.R` beforehand —
-they write the `.rds` components that `dge_gsea_panel.R` combines.
+Fig. 6 is assembled by `dge_gsea_panel.R` from the `.rds` components written by
+`volcano_by_region.R` and `gsea_heatmap.R`, so those two run first.
 
 Fig. 3 additionally depends on two hardcoded conserved module pairs
 (`DLPFC_AD_14__PCC_AD_25`, `DLPFC_Control_3__PCC_Control_2`) inside `6.core_modules.R` — if the

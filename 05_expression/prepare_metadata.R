@@ -7,9 +7,11 @@ suppressPackageStartupMessages({
   library(stringr)
 })
 
-# ===================== PATHS ===================== #
-in_dir  <- "data/expression"
-out_rds <- "results/metadata_sex.rds"
+# ===================== PATHS (repo-relative; run from the repository root) ===================== #
+source("config/paths.R")
+
+in_dir  <- file.path(INPUTS_DIR, "expression_matrices")
+out_rds <- file.path(OUTPUTS_DIR, "metadata_sex.rds")
 dir.create(dirname(out_rds), recursive = TRUE, showWarnings = FALSE)
 
 files <- list.files(in_dir, pattern = "\\.txt$", full.names = TRUE)

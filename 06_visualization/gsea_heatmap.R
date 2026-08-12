@@ -7,9 +7,12 @@ suppressPackageStartupMessages({
   library(scales)
 })
 
-# ===================== CONFIG ===================== #
-in_tsv  <- "results/gsea_reactome/GSEA_top_terms_by_region.tsv"
-out_dir <- "results/figures"
+# ===================== CONFIG (repo-relative; run from the repository root) ===================== #
+# NOTE: intermediate component consumed by dge_gsea_panel.R (Figure 6), stays under outputs/.
+source("config/paths.R")
+
+in_tsv  <- file.path(OUTPUTS_DIR, "gsea_reactome", "GSEA_top_terms_by_region.tsv")
+out_dir <- file.path(OUTPUTS_DIR, "figures")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 REG_ORDER <- c("CRB", "TC", "DLPFC", "HCN", "PCC")

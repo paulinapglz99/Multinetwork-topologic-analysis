@@ -11,10 +11,12 @@ suppressPackageStartupMessages({
 
 options(stringsAsFactors = FALSE)
 
-# ===================== CONFIG ===================== #
-dge_dir <- "results/dge_limma"
-deg_dir <- "results/centrality_comparison/degree"
-out_dir <- "results/dge_degree"
+# ===================== CONFIG (repo-relative; run from the repository root) ===================== #
+source("config/paths.R")
+
+dge_dir <- file.path(OUTPUTS_DIR, "dge_limma")
+deg_dir <- file.path(OUTPUTS_DIR, "centrality_comparison", "degree")
+out_dir <- file.path(OUTPUTS_DIR, "dge_degree")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 FDR_CUT <- 0.05

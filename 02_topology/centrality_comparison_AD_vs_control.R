@@ -9,9 +9,11 @@ suppressPackageStartupMessages({
 
 options(stringsAsFactors = FALSE)
 
-# ===================== PATHS ===================== #
-in_dir   <- "data/edgelists"
-out_base <- "results/centrality_comparison"
+# ===================== PATHS (repo-relative; run from the repository root) ===================== #
+source("config/paths.R")
+
+in_dir   <- file.path(INPUTS_DIR, "networks")
+out_base <- file.path(OUTPUTS_DIR, "centrality_comparison")
 dir.create(out_base, recursive = TRUE, showWarnings = FALSE)
 
 # ===================== NETWORKS ===================== #

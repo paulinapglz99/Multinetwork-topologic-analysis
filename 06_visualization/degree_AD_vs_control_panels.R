@@ -16,9 +16,11 @@ suppressPackageStartupMessages({
 
 options(stringsAsFactors = FALSE)
 
-# ===================== CONFIG ===================== #
-in_base <- "results/centrality_comparison"
-out_dir <- "results/figures"
+# ===================== CONFIG (repo-relative; run from the repository root) ===================== #
+source("config/paths.R")
+
+in_base <- file.path(OUTPUTS_DIR, "centrality_comparison")
+out_dir <- PLOTS_DIR  # this script's ggsave output is the final Figure 5
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 centralities <- c("degree")
@@ -380,11 +382,11 @@ make_grid_degree <- function() {
 p <- make_grid_degree()
 
 ggsave(
-  filename = file.path(out_dir, "degree_AD_vs_control_panels.pdf"),
+  filename = file.path(out_dir, "Figure5_degree_AD_vs_control_panels.pdf"),
   plot = p, width = 16, height = 8
 )
 ggsave(
-  filename = file.path(out_dir, "degree_AD_vs_control_panels.png"),
+  filename = file.path(out_dir, "Figure5_degree_AD_vs_control_panels.png"),
   plot = p, width = 16, height = 8, dpi = 300
 )
 

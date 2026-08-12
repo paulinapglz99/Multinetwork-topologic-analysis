@@ -9,14 +9,17 @@ suppressPackageStartupMessages({
   library(stringr)
 })
 
-# ===================== CONFIG ===================== #
-fig_dir <- "results/figures"
+# ===================== CONFIG (repo-relative; run from the repository root) ===================== #
+source("config/paths.R")
+
+fig_dir <- file.path(OUTPUTS_DIR, "figures")
 
 volcano_rds <- file.path(fig_dir, "volcano_by_region_AD_vs_control.rds")
 heat_rds    <- file.path(fig_dir, "gsea_heatmap.rds")
 
-out_png <- file.path(fig_dir, "DGE_GSEA_panel.png")
-out_pdf <- file.path(fig_dir, "DGE_GSEA_panel.pdf")
+# Final manuscript figure (Fig. 6) — goes to plots/, not outputs/
+out_png <- file.path(PLOTS_DIR, "Figure6_DGE_GSEA_panel.png")
+out_pdf <- file.path(PLOTS_DIR, "Figure6_DGE_GSEA_panel.pdf")
 out_rds <- file.path(fig_dir, "DGE_GSEA_panel.rds")
 
 REG_ORDER  <- c("CRB", "TC", "DLPFC", "HCN", "PCC")

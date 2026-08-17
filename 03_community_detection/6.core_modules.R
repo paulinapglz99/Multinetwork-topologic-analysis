@@ -798,7 +798,11 @@ prepare_cnet_tg <- function(g, top_n_go = 20) {
     tidygraph::activate(nodes) %>%
     dplyr::mutate(
       is_go      = (type == "GO"),
-      fill_go    = ifelse(is_go, -log10(p_adjust + 1e-10), NA_real_),
+      # Epsilon only guards against log(0); it must stay far below any real
+      # p_adjust or it swamps genuinely tiny values (seen down to ~1e-25)
+      # and clips -log10 at ~10 for all of them, which is what produced the
+      # confusing "9.999999"-style legend.
+      fill_go    = ifelse(is_go, -log10(p_adjust + .Machine$double.xmin), NA_real_),
       degree     = tidygraph::centrality_degree(),
       node_size  = ifelse(
         is_go,
@@ -883,7 +887,7 @@ plot_cnet <- function(tg, pair_title, pair_subtitle,
     ggraph::geom_node_label(
       data          = function(x) dplyr::filter(x, !is_go),
       aes(label     = name),
-      size          = 3.0,
+      size          = 3.6,
       fill          = "grey97",
       color         = "grey10",
       fontface      = "bold",
@@ -912,7 +916,7 @@ plot_cnet <- function(tg, pair_title, pair_subtitle,
     ggraph::geom_node_label(
       data          = function(x) dplyr::filter(x, is_go),
       aes(label     = label),
-      size          = 3.1,
+      size          = 3.7,
       fill          = "white",
       color         = "grey10",
       fontface      = "plain",

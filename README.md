@@ -50,15 +50,16 @@ and locate their I/O via `config/paths.R` (no absolute or machine-specific paths
 ## Setup: populating `inputs/`
 
 `inputs/` is gitignored — real pipeline data must be placed there locally before running the
-scripts that produce Figures 1–4 and S1–S2. Expected layout:
+scripts that produce the manuscript figures. Expected layout:
 
 ```
 inputs/
-├── networks/      # filtered co-expression edgelists (*.tsv), one per region × phenotype
-├── topology/      # networks_summary.csv + *_nodes_summary.csv (from 02_topology, --per_node)
-├── enrichment/    # *_enrichment.csv (from 03_community_detection/community_enrichment_MF_BP_KEGG.R)
-├── DEGS/          # limma_*_allGenes.tsv differential expression tables (one per region)
-└── graphs/        # translated (gene-symbol) .graphml networks, used by gabaergic_rewiring.R
+├── networks/             # filtered co-expression edgelists (*.tsv), one per region × phenotype
+├── topology/             # networks_summary.csv + *_nodes_summary.csv (from 02_topology, --per_node)
+├── enrichment/           # *_enrichment.csv (from 03_community_detection/community_enrichment_MF_BP_KEGG.R)
+├── DEGS/                 # limma_*_allGenes.tsv differential expression tables (one per region)
+├── expression_matrices/  # per-region *_counts_{AD,control}.tsv + metadata .txt (05_expression)
+└── graphs/               # translated (gene-symbol) .graphml networks, used by gabaergic_rewiring.R
 ```
 
 `00_preprocessing/*.R` and `05_expression/metadata_demographics.R` read raw counts/metadata
@@ -172,8 +173,6 @@ Run with: `bash/run_module_expression_summary.sh`
 
 Run with: `bash/run_jaccard.sh`
 
-Visualization scripts read from `results/` and write figures (PDF and PNG) to `results/figures/`.
-
 ---
 
 ## Figures
@@ -188,16 +187,14 @@ unprefixed.
 | Fig. 2 | `Figure2_panel_module_counts.jpeg` | `03_community_detection/6.core_modules.R` |
 | Fig. 3 | `Figure3_cnet_conserved_pairs.jpeg` | `03_community_detection/6.core_modules.R` |
 | Fig. 4 | `Figure4_hub_heatmaps_logfc.jpeg` | `04_hub_analysis/4.wide_hubs.R` |
-| Fig. 5 | *(no script in this repo — see note below)* | — |
-| Fig. 6 | *(no script in this repo — see note below)* | — |
+| Fig. 5 | `Figure5_degree_AD_vs_control_panels.{png,pdf}` | `06_visualization/degree_AD_vs_control_panels.R` |
+| Fig. 6 | `Figure6_DGE_GSEA_panel.{png,pdf}` | `06_visualization/dge_gsea_panel.R` |
 | Fig. S1 | `FigureS1_contributions_pca.jpeg` | `06_visualization/3.plots_global.R` |
 | Fig. S2 | `FigureS2_jaccard_histogram.jpeg` | `03_community_detection/6.core_modules.R` |
-| Fig. S3 | *(no script in this repo — see note below)* | — |
+| Fig. S3 | `FigureS3_DGE_degree_scatter.{png,pdf}` | `06_visualization/dge_degree_scatter.R` |
 
-Figs. 5, 6 and S3 (`Scatter_degree_Top0.3pct_by_absDeltaPercentile_600dpi.png`,
-`DGE_GSEA_grind_N.png`, `TTop10pct_LFC_vs_DeltaPerc.png`) were produced outside this repository
-(no tracked script generates them). If the original code is found, add it under the appropriate
-numbered stage; otherwise they need to be rebuilt from scratch.
+Fig. 6 is assembled by `dge_gsea_panel.R` from the `.rds` components written by
+`volcano_by_region.R` and `gsea_heatmap.R`, so those two run first.
 
 Fig. 3 additionally depends on two hardcoded conserved module pairs
 (`DLPFC_AD_14__PCC_AD_25`, `DLPFC_Control_3__PCC_Control_2`) inside `6.core_modules.R` — if the

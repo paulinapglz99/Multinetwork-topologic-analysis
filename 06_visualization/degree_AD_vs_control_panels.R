@@ -23,8 +23,6 @@ in_base <- file.path(OUTPUTS_DIR, "centrality_comparison")
 out_dir <- PLOTS_DIR  # this script's ggsave output is the final Figure 5
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-centralities <- c("degree")
-
 # Region labels used in the scatter panels
 networks_scatter <- c("PCC", "DLPFC", "HCN", "CRB", "TC")
 
@@ -33,7 +31,6 @@ networks_bar <- c("PCC", "DLPFC", "HCN", "MAYO_CRB", "MAYO_TC")
 
 TOP_PROP <- 0.003  # top 0.3% by |delta percentile rank|
 
-CENT_LABELS <- c(degree = "Degree")
 SIGMA <- 1e-8
 plog  <- scales::pseudo_log_trans(base = 10, sigma = SIGMA)
 
@@ -52,18 +49,11 @@ fmt_si <- scales::label_number(
   scale_cut = scales::cut_si("")
 )
 
-cent_pretty <- function(cent_name) {
-  out <- unname(CENT_LABELS[cent_name])
-  if (is.na(out) || length(out) != 1) return(cent_name)
-  out
-}
-
-# ===================== HELPERS (scatter inputs) ===================== #
-read_common_tbl <- function(net, cent) {
+# ===================== HELPERS ===================== #
+read_common_tbl <- function(net) {
   file_net <- dplyr::recode(net, CRB = "MAYO_CRB", TC = "MAYO_TC", .default = net)
-  std_net  <- net
 
-  f <- file.path(in_base, cent, paste0(file_net, "_", cent, "_COMMON.tsv"))
+  f <- file.path(in_base, "degree", paste0(file_net, "_degree_COMMON.tsv"))
   if (!file.exists(f)) return(NULL)
 
   df <- vroom::vroom(f, show_col_types = FALSE)
@@ -73,13 +63,12 @@ read_common_tbl <- function(net, cent) {
   if (length(miss) > 0) stop("Missing columns in ", f, ": ", paste(miss, collapse = ", "))
 
   df %>%
-    mutate(network = std_net, centrality = cent) %>%
-    dplyr::select(network, centrality, everything())
+    mutate(network = net) %>%
+    dplyr::select(network, everything())
 }
 
 read_spearman_tbl <- function(net) {
   file_net <- dplyr::recode(net, CRB = "MAYO_CRB", TC = "MAYO_TC", .default = net)
-  std_net  <- net
 
   f <- file.path(in_base, "spearman", paste0(file_net, "_spearman.tsv"))
   if (!file.exists(f)) return(NULL)
@@ -91,16 +80,13 @@ read_spearman_tbl <- function(net) {
   if (length(miss) > 0) stop("Missing columns in ", f, ": ", paste(miss, collapse = ", "))
 
   df %>%
-    mutate(
-      network    = std_net,
-      centrality = as.character(centrality)
-    ) %>%
-    dplyr::select(network, centrality, n_common_genes, spearman_rho, spearman_pvalue)
+    filter(centrality == "degree") %>%
+    mutate(network = net) %>%
+    dplyr::select(network, n_common_genes, spearman_rho, spearman_pvalue)
 }
 
 map_ensembl_to_hgnc <- function(ens_ids) {
-  ens_ids <- unique(ens_ids)
-  ens_ids <- sub("\\..*$", "", ens_ids)
+  ens_ids <- unique(sub("\\..*$", "", ens_ids))
 
   mart <- biomaRt::useEnsembl(biomart = "genes", dataset = "hsapiens_gene_ensembl")
 
@@ -114,36 +100,39 @@ map_ensembl_to_hgnc <- function(ens_ids) {
     distinct(ensembl_gene_id, .keep_all = TRUE)
 }
 
-# ===================== LOAD COMMON TABLES (degree) ===================== #
-all_common <- purrr::map_dfr(
-  networks_scatter,
-  \(net) purrr::map_dfr(centralities, \(cent) read_common_tbl(net, cent))
-)
+# ===================== LOAD ===================== #
+all_common <- purrr::map_dfr(networks_scatter, read_common_tbl)
 if (nrow(all_common) == 0) stop("No *_COMMON.tsv files were loaded. Check paths and filenames.")
 
-# ===================== BIOMART ANNOTATION ===================== #
-cat("Annotating ENSG -> HGNC with biomaRt...\n")
-ann <- map_ensembl_to_hgnc(all_common$gene)
+map_cache <- file.path(in_base, "ensembl_to_hgnc_cache.rds")
+
+if (file.exists(map_cache)) {
+  cat("Loading cached HGNC mapping:", map_cache, "\n")
+  ann <- readRDS(map_cache)
+} else {
+  cat("Annotating ENSG -> HGNC with biomaRt...\n")
+  ann <- map_ensembl_to_hgnc(all_common$gene)
+  saveRDS(ann, map_cache)
+}
 
 all_common <- all_common %>%
   mutate(gene_key = sub("\\..*$", "", gene)) %>%
   left_join(ann, by = c("gene_key" = "ensembl_gene_id")) %>%
   mutate(gene_label = ifelse(!is.na(hgnc_symbol) & hgnc_symbol != "", hgnc_symbol, NA_character_))
 
-# ===================== TOP GENES PER PANEL (by |delta percentile|) ===================== #
+# Top genes per panel by |delta percentile|
 top_tbl <- all_common %>%
-  group_by(network, centrality) %>%
+  group_by(network) %>%
   mutate(abs_dperc = abs(delta_perc)) %>%
   slice_max(order_by = abs_dperc, prop = TOP_PROP, with_ties = FALSE) %>%
   ungroup()
 
-# ===================== LOAD SPEARMAN RESULTS ===================== #
 spearman_all <- purrr::map_dfr(networks_scatter, read_spearman_tbl)
 if (nrow(spearman_all) == 0) stop("No spearman/<NET>_spearman.tsv files were loaded. Check paths and filenames.")
 
 # ===================== RHO LABEL POSITION (robust under transforms) ===================== #
 rho_pos <- all_common %>%
-  group_by(network, centrality) %>%
+  group_by(network) %>%
   summarise(
     x_raw_min = suppressWarnings(min(AD,  na.rm = TRUE)),
     x_raw_max = suppressWarnings(max(AD,  na.rm = TRUE)),
@@ -151,7 +140,7 @@ rho_pos <- all_common %>%
     y_raw_max = suppressWarnings(max(CTL, na.rm = TRUE)),
     .groups = "drop"
   ) %>%
-  left_join(spearman_all, by = c("network", "centrality")) %>%
+  left_join(spearman_all, by = "network") %>%
   mutate(
     x_raw_min = ifelse(is.finite(x_raw_min), x_raw_min, 0),
     x_raw_max = ifelse(is.finite(x_raw_max), x_raw_max, x_raw_min),
@@ -176,7 +165,7 @@ rho_pos <- all_common %>%
     y = plog$inverse(y_tr)
   )
 
-# ===================== BARPLOT (degree) -> first panel ===================== #
+# ===================== BARPLOT -> first panel ===================== #
 make_barplot_degree <- function() {
 
   NET_LABELS_BAR <- c(
@@ -196,9 +185,9 @@ make_barplot_degree <- function() {
   BAR_ALPHA <- 0.78
   LABEL_MIN_PROP <- 0.035
 
-  read_full_common <- function(net, cent) {
-    f_full   <- file.path(in_base, cent, paste0(net, "_", cent, "_FULL.tsv"))
-    f_common <- file.path(in_base, cent, paste0(net, "_", cent, "_COMMON.tsv"))
+  read_full_common <- function(net) {
+    f_full   <- file.path(in_base, "degree", paste0(net, "_degree_FULL.tsv"))
+    f_common <- file.path(in_base, "degree", paste0(net, "_degree_COMMON.tsv"))
     if (!file.exists(f_full))   stop("Missing: ", f_full)
     if (!file.exists(f_common)) stop("Missing: ", f_common)
 
@@ -224,7 +213,7 @@ make_barplot_degree <- function() {
     )
   }
 
-  summary_tbl <- bind_rows(lapply(networks_bar, read_full_common, cent = "degree")) %>%
+  summary_tbl <- bind_rows(lapply(networks_bar, read_full_common)) %>%
     mutate(network_label = unname(NET_LABELS_BAR[network]))
 
   plot_df <- summary_tbl %>%
@@ -286,21 +275,20 @@ make_barplot_degree <- function() {
 p_bar_degree <- make_barplot_degree()
 
 # ===================== SCATTER (per region) ===================== #
-make_scatter_one_network <- function(cent_name, net_name) {
+make_scatter_one_network <- function(net_name) {
 
-  df_cent  <- all_common %>% filter(centrality == cent_name, network == net_name)
-  top_cent <- top_tbl     %>% filter(centrality == cent_name, network == net_name)
-  rho_cent <- rho_pos     %>% filter(centrality == cent_name, network == net_name)
+  df_net  <- all_common %>% filter(network == net_name)
+  top_net <- top_tbl    %>% filter(network == net_name)
+  rho_net <- rho_pos    %>% filter(network == net_name)
 
-  top_cent_lab <- top_cent %>% filter(!is.na(gene_label) & gene_label != "")
-  cent_title <- cent_pretty(cent_name)
+  top_net_lab <- top_net %>% filter(!is.na(gene_label) & gene_label != "")
 
-  ggplot(df_cent, aes(x = AD, y = CTL)) +
+  ggplot(df_net, aes(x = AD, y = CTL)) +
     geom_point(aes(color = HigherNetwork), alpha = 0.22, size = 1.1) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", linewidth = 0.5, color = "grey45") +
-    geom_point(data = top_cent, aes(color = HigherNetwork), alpha = 0.95, size = 2.8) +
+    geom_point(data = top_net, aes(color = HigherNetwork), alpha = 0.95, size = 2.8) +
     ggrepel::geom_label_repel(
-      data = top_cent_lab,
+      data = top_net_lab,
       aes(label = gene_label),
       inherit.aes = TRUE,
       fill = "white",
@@ -321,7 +309,7 @@ make_scatter_one_network <- function(cent_name, net_name) {
       seed = 1
     ) +
     geom_label(
-      data = rho_cent,
+      data = rho_net,
       aes(x = x, y = y, label = rho_label, fill = rho_abs),
       inherit.aes = FALSE,
       label.size = 0.25,
@@ -341,9 +329,9 @@ make_scatter_one_network <- function(cent_name, net_name) {
     ) +
     labs(
       title = net_name,
-      x = paste0(cent_title, " (AD network)"),
-      y = paste0(cent_title, " (Control network)"),
-      color = paste0("Higher\n", cent_title)
+      x = "Degree (AD network)",
+      y = "Degree (Control network)",
+      color = "Higher\nDegree"
     ) +
     scale_x_continuous(trans = plog, breaks = safe_breaks(n = 2), labels = fmt_si) +
     scale_y_continuous(trans = plog, breaks = safe_breaks(n = 2), labels = fmt_si) +
@@ -357,30 +345,23 @@ make_scatter_one_network <- function(cent_name, net_name) {
 }
 
 # ===================== GRID (barplot + 5 scatters) ===================== #
-make_grid_degree <- function() {
-  cent_name <- "degree"
-  cent_title <- cent_pretty(cent_name)
+scat_list <- lapply(networks_scatter, \(nn) make_scatter_one_network(nn) +
+                      theme(legend.position = "none"))
 
-  scat_list <- lapply(networks_scatter, \(nn) make_scatter_one_network(cent_name, nn) +
-                        theme(legend.position = "none"))
+p_bar_panel <- p_bar_degree + labs(title = "Proportion of genes by network")
 
-  p_bar_panel <- p_bar_degree + labs(title = "Proportion of genes by network")
+p <- wrap_plots(
+  c(list(p_bar_panel), scat_list),
+  ncol = 3
+) +
+  plot_annotation(
+    title = "Degree centrality: AD vs control"
+  ) &
+  theme(
+    plot.title = element_text(face = "bold", size = 15, hjust = 0.5)
+  )
 
-  wrap_plots(
-    c(list(p_bar_panel), scat_list),
-    ncol = 3
-  ) +
-    plot_annotation(
-      title = paste0(cent_title, " centrality: AD vs control")
-    ) &
-    theme(
-      plot.title = element_text(face = "bold", size = 15, hjust = 0.5)
-    )
-}
-
-# ===================== RUN + SAVE ===================== #
-p <- make_grid_degree()
-
+# ===================== SAVE ===================== #
 ggsave(
   filename = file.path(out_dir, "Figure5_degree_AD_vs_control_panels.pdf"),
   plot = p, width = 16, height = 8

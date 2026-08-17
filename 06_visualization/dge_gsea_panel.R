@@ -27,23 +27,26 @@ STRIP_FILL <- "grey92"
 
 # ===================== SIZES ===================== #
 # Volcano
-VOL_BASE       <- 14.5
-VOL_STRIP_SZ   <- 15.5
-VOL_AXIS_TXT   <- 12.5
-VOL_AXIS_TTL   <- 13.5
+VOL_BASE       <- 16
+VOL_STRIP_SZ   <- 18
+VOL_AXIS_TXT   <- 14.5
+VOL_AXIS_TTL   <- 17
 
 # Heatmap
-HEAT_BASE      <- 14.5
-HEAT_STRIP_SZ  <- 15.0
-HEAT_Y_SZ      <- 10.2
-STAR_SZ        <- 4.4
+HEAT_BASE      <- 16
+HEAT_STRIP_SZ  <- 17
+HEAT_Y_SZ      <- 12.5
+STAR_SZ        <- 5.2
 
 # Legend typography
-LEG_TITLE_SZ <- 13
-LEG_TEXT_SZ  <- 12
+LEG_TITLE_SZ <- 16
+LEG_TEXT_SZ  <- 14
+
+# Panel tags
+TAG_SZ <- 26
 
 # Wrap width for term labels
-WRAP_WIDTH <- 62
+WRAP_WIDTH <- 55
 
 # Output device size
 OUT_W_IN <- 24
@@ -55,17 +58,19 @@ p_volcano0 <- readRDS(volcano_rds)
 p_heat_old <- readRDS(heat_rds)
 
 # ===================== HEATMAP DATA ===================== #
+# term_simple comes ordered by max |NES|; wrapping must preserve that order
 df2 <- p_heat_old$data %>%
   mutate(
     region       = factor(region, levels = REG_ORDER),
-    term_wrapped = stringr::str_wrap(term_simple, width = WRAP_WIDTH),
+    term_wrapped = factor(
+      stringr::str_wrap(as.character(term_simple), width = WRAP_WIDTH),
+      levels = stringr::str_wrap(levels(term_simple), width = WRAP_WIDTH)
+    ),
     x1           = 1
   )
 
 # ===================== HEATMAP ===================== #
-# facet_grid(. ~ region) reproduces the grey strip used by the volcano;
-# the fixed x limits keep the panel tight around the tile column and the
-# term labels sit on the right axis.
+# facet strips match the volcano; fixed x limits keep the tile column tight
 p_heat <- ggplot(df2, aes(x = x1, y = term_wrapped)) +
   geom_tile(
     aes(fill = NES, alpha = alpha_sig),
@@ -94,6 +99,7 @@ p_heat <- ggplot(df2, aes(x = x1, y = term_wrapped)) +
     midpoint = 0
   ) +
   scale_alpha(guide = "none") +
+  labs(tag = "B)") +
   theme_bw(base_size = HEAT_BASE) +
   theme(
     axis.title   = element_blank(),
@@ -104,7 +110,7 @@ p_heat <- ggplot(df2, aes(x = x1, y = term_wrapped)) +
     axis.text.y  = element_text(
       size = HEAT_Y_SZ,
       face = "bold",
-      lineheight = 1.10,
+      lineheight = 1.05,
       margin = margin(l = 8)
     ),
     axis.ticks.y = element_line(linewidth = 0.3),
@@ -115,11 +121,14 @@ p_heat <- ggplot(df2, aes(x = x1, y = term_wrapped)) +
     panel.spacing.x  = unit(0.15, "lines"),
     plot.margin      = margin(t = 8, r = 10, b = 8, l = 8),
 
+    plot.tag         = element_text(face = "bold", size = TAG_SZ),
+
     legend.position  = "none"
   )
 
 # ===================== VOLCANO ===================== #
 p_volcano <- p_volcano0 +
+  labs(tag = "A)") +
   theme_bw(base_size = VOL_BASE) +
   theme(
     strip.background = element_rect(fill = STRIP_FILL, color = NA),
@@ -129,6 +138,7 @@ p_volcano <- p_volcano0 +
     axis.title = element_text(size = VOL_AXIS_TTL, face = "bold"),
 
     plot.margin = margin(t = 8, r = 8, b = 8, l = 8),
+    plot.tag    = element_text(face = "bold", size = TAG_SZ),
     legend.position = "none"
   )
 

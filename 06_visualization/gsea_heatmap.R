@@ -41,7 +41,7 @@ plot_df <- top_terms %>%
   )
 
 # ===================== PLOT ===================== #
-p <- ggplot(plot_df, aes(region, term_simple)) +
+p <- ggplot(plot_df, aes(x = 1, y = term_simple)) +
   geom_tile(
     aes(fill = NES, alpha = alpha_sig),
     color = "grey92", linewidth = 0.4
@@ -49,6 +49,13 @@ p <- ggplot(plot_df, aes(region, term_simple)) +
   geom_text(
     aes(label = star),
     fontface = "bold", size = 4, color = "grey10"
+  ) +
+  facet_grid(. ~ region, switch = "x") +
+  scale_x_continuous(
+    NULL,
+    breaks = NULL,
+    limits = c(0.5, 1.5),
+    expand = expansion(mult = c(0, 0))
   ) +
   scale_fill_gradient2(
     name = "NES",
@@ -64,18 +71,14 @@ p <- ggplot(plot_df, aes(region, term_simple)) +
     panel.grid   = element_blank(),
 
     axis.text.y  = element_text(size = 10, face = "bold"),
-    axis.text.x  = element_text(size = 14, face = "bold"),
 
     legend.title = element_text(size = 14, face = "bold"),
     legend.text  = element_text(size = 12, face = "bold"),
 
-    plot.caption = element_text(size = 10, face = "bold", hjust = 0),
-
-    axis.text.y.right = element_text(face = "bold"),
-    strip.background  = element_rect(fill = "grey92", color = NA),
-    strip.text        = element_text(face = "bold")
-  ) +
-  facet_grid(. ~ region, switch = "x")
+    panel.spacing.x  = unit(0.15, "lines"),
+    strip.background = element_rect(fill = "grey92", color = NA),
+    strip.text       = element_text(size = 14, face = "bold")
+  )
 
 p <- p + theme(plot.margin = margin(t = 8, r = 25, b = 8, l = 8))
 

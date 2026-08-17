@@ -502,7 +502,7 @@ ht_ctr_fc <- plot_heatmap_gg(
 legend_only     <- cowplot::get_legend(ht_ad_fc + theme(legend.position = "right"))
 ht_ad_fc_noleg  <- ht_ad_fc  + theme(legend.position = "none")
 ht_ctr_fc_noleg <- ht_ctr_fc + theme(legend.position = "none",
-                                     axis.text.y = element_text(size = 7))
+                                     axis.text.y = element_text(size = 8.5))
 
 hts_fc <- cowplot::plot_grid(
   cowplot::plot_grid(
@@ -517,8 +517,8 @@ hts_fc <- cowplot::plot_grid(
   rel_widths = c(1, 0.08)
 )
 
-ggsave(file.path(PLOTS_DIR, "Figure4_hub_heatmaps_logfc.jpeg"), plot = hts_fc, width = 12, height = 8, dpi = 300)
-ggsave(file.path(PLOTS_DIR, "Figure4_hub_heatmaps_logfc.pdf"),  plot = hts_fc, width = 12, height = 8, dpi = 300)
+ggsave(file.path(PLOTS_DIR, "Figure4_hub_heatmaps_logfc.jpeg"), plot = hts_fc, width = 12, height = 10, dpi = 300)
+ggsave(file.path(PLOTS_DIR, "Figure4_hub_heatmaps_logfc.pdf"),  plot = hts_fc, width = 12, height = 10, dpi = 300)
 
 message("Done! All outputs saved to: ", opt$out_dir)
 

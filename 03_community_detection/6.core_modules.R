@@ -218,9 +218,25 @@ build_cnet_graph <- function(enrich_res, pair_id, output_dir = NULL) {
     dplyr::rename(from = ID, to = geneID) |>
     dplyr::mutate(Pair_ID = pair_id)
   
+  # A couple of GO term names are long enough to collide with their
+  # neighbors in the cnet plots regardless of layout/repel tuning — shorten
+  # just those two for display (full term still available via `ID`/GO.db).
+  short_go_label <- c(
+    "regulation of regulated secretory pathway"        = "regulation of secretory pathway",
+    # panel subtitle already reads "Microglial immune response", so the
+    # "involved in immune response" qualifier is redundant here
+    "leukocyte activation involved in immune response" = "leukocyte activation"
+  )
+
   nodes_go <- res |>
     dplyr::select(ID, Description, pvalue, p.adjust, qvalue, GeneRatio, Count) |>
     dplyr::distinct() |>
+    dplyr::mutate(
+      Description = dplyr::recode(Description, !!!short_go_label),
+      # Wrap onto multiple lines so long GO term boxes grow taller instead
+      # of wider — narrower boxes collide with their neighbors far less.
+      Description = stringr::str_wrap(Description, width = 18)
+    ) |>
     dplyr::transmute(
       name = ID, label = Description, type = "GO",
       Pair_ID = pair_id,
@@ -450,10 +466,23 @@ pair_gene_sets <- conserved_pairs |>
 # GO enrichment on each intersection (only pairs with sufficient overlap)
 pair_intersections <- dplyr::filter(pair_gene_sets, N_intersection >= min_genes)
 
-go_by_pair <- purrr::set_names(
-  purrr::map(pair_intersections$Genes_intersection, run_go_enrichment),
-  pair_intersections$Pair_ID
-)
+# This clusterProfiler::enrichGO() call is the slow part of the script (one
+# query per pair, several minutes total). Cache it so cosmetic-only reruns
+# (e.g. tweaking the cnet plots below) don't recompute it — delete the cache
+# file if pair_intersections/min_genes/run_go_enrichment change and a fresh
+# enrichment run is actually needed.
+go_by_pair_cache <- file.path(output_dir, "go_by_pair_cache.rds")
+
+if (file.exists(go_by_pair_cache)) {
+  message("Loading cached GO enrichment from: ", go_by_pair_cache)
+  go_by_pair <- readRDS(go_by_pair_cache)
+} else {
+  go_by_pair <- purrr::set_names(
+    purrr::map(pair_intersections$Genes_intersection, run_go_enrichment),
+    pair_intersections$Pair_ID
+  )
+  saveRDS(go_by_pair, go_by_pair_cache)
+}
 
 # Build and export cnet GraphML files
 cnet_networks <- purrr::imap(go_by_pair, ~ build_cnet_graph(.x, .y, output_dir = "graphml_cnet_networks"))
@@ -821,7 +850,7 @@ compute_concentric_layout <- function(tg, inner_r = 1, outer_r = 3) {
 # inner_r / outer_r: radii of the GO and gene circles respectively
 plot_cnet <- function(tg, pair_title, pair_subtitle,
                       go_color = aaas_cols[3],
-                      seed     = 42,
+                      seed     = 2024,
                       inner_r  = 1,
                       outer_r  = 3) {
   set.seed(seed)
@@ -854,12 +883,12 @@ plot_cnet <- function(tg, pair_title, pair_subtitle,
     ggraph::geom_node_label(
       data          = function(x) dplyr::filter(x, !is_go),
       aes(label     = name),
-      size          = 2.4,
+      size          = 3.0,
       fill          = "grey97",
       color         = "grey10",
       fontface      = "bold",
       label.size    = 0.10,
-      label.padding = unit(0.12, "lines"),
+      label.padding = unit(0.14, "lines"),
       repel         = TRUE,
       max.overlaps  = 40,
       seed          = seed
@@ -883,14 +912,16 @@ plot_cnet <- function(tg, pair_title, pair_subtitle,
     ggraph::geom_node_label(
       data          = function(x) dplyr::filter(x, is_go),
       aes(label     = label),
-      size          = 2.5,
+      size          = 3.1,
       fill          = "white",
       color         = "grey10",
       fontface      = "plain",
       label.size    = 0.12,
-      label.padding = unit(0.15, "lines"),
+      label.padding = unit(0.18, "lines"),
       repel         = TRUE,
       max.overlaps  = 30,
+      box.padding   = 0.6,
+      force         = 3,
       seed          = seed
     ) +
     
@@ -910,26 +941,30 @@ plot_cnet <- function(tg, pair_title, pair_subtitle,
 
 # --- Build the two panels ---
 
-# Pair A: AD synaptic pair — 3 genes, compact inner/outer radii
+# Pair A: AD synaptic pair — 3 genes, 15 GO terms; slightly wider inner
+# radius than the original compact layout so the larger label text (bumped
+# for legibility) doesn't collide between adjacent terms.
 tg_ad <- prepare_cnet_tg(cnet_networks[["DLPFC_AD_14__PCC_AD_25"]], top_n_go = 15)
 p_cnet_ad <- plot_cnet(
   tg_ad,
   pair_title    = "PCC AD 25 -- DLPFC AD 14",
   pair_subtitle = "Synaptic transmission",
   go_color      = aaas_cols[2],
-  inner_r       = 1,
-  outer_r       = 2.5
+  inner_r       = 2.2,
+  outer_r       = 4.2
 )
 
-# Pair B: Control immune pair — many genes, larger outer radius to avoid crowding
+# Pair B: Control immune pair — many genes and many GO terms; wider inner
+# radius keeps the 13 crowded GO-term labels from overlapping each other,
+# wider outer radius keeps the gene ring clear of the bigger inner cluster.
 tg_ctrl <- prepare_cnet_tg(cnet_networks[["DLPFC_Control_3__PCC_Control_2"]], top_n_go = 13)
 p_cnet_ctrl <- plot_cnet(
   tg_ctrl,
   pair_title    = "PCC Control 2 -- DLPFC Control 3",
   pair_subtitle = "Microglial immune response",
   go_color      = aaas_cols[1],
-  inner_r       = 1,
-  outer_r       = 4     # wider outer ring for the larger gene set
+  inner_r       = 2.1,
+  outer_r       = 5.5
 )
 p_cnet_ctrl
 

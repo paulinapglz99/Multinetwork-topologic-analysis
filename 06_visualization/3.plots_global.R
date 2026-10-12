@@ -1,10 +1,11 @@
 #!/usr/bin/env Rscript
 # =============================================================================
 # plots_global.R
-# Generate global network topology plots: distance heatmap, PCA, metric
-# differences heatmap, and Jaccard connectivity overlap.
+# Generate global network topology plots: PCA and metric differences heatmap.
+# Also computes the AD vs control Jaccard edge overlap per region (console).
 # Requires: networks_summary.csv and raw network .tsv files
 # =============================================================================
+set.seed(10)
 
 # -----------------------------------------------------------------------------
 # 0. Dependencies
@@ -123,45 +124,6 @@ globals_scaled <- globals %>%
   scale()
 
 dist_matrix <- dist(globals_scaled, method = "euclidean") %>% as.matrix()
-
-# Hierarchical clustering for ordered heatmap
-hc_dist      <- hclust(dist(dist_matrix), method = "ward.D2")
-ord          <- hc_dist$order
-cluster_order <- cutree(hc_dist, k = 4)[ord]
-breaks        <- which(diff(cluster_order) != 0)
-
-dist_long <- as.data.frame(dist_matrix[ord, ord]) %>%
-  rownames_to_column("Network1") %>%
-  pivot_longer(-Network1, names_to = "Network2", values_to = "Distance") %>%
-  mutate(
-    Network1 = factor(Network1, levels = rownames(dist_matrix)[ord]),
-    Network2 = factor(Network2, levels = colnames(dist_matrix)[ord])
-  ) %>%
-  filter(as.integer(Network1) <= as.integer(Network2))
-
-heatmap_dist <- ggplot(dist_long, aes(Network1, Network2, fill = Distance)) +
-  geom_tile() +
-  scale_fill_viridis_c(
-    guide = guide_colorbar(
-      position       = "top",
-      barheight      = unit(10,  "pt"),
-      barwidth       = unit(140, "pt"),
-      title.position = "top"
-    )
-  ) +
-  coord_fixed() +
-  geom_hline(yintercept = breaks + 0.5, color = "black", linewidth = 0.7) +
-  geom_vline(xintercept = breaks + 0.5, color = "black", linewidth = 0.7) +
-  theme_minimal() +
-  theme(
-    panel.grid   = element_blank(),
-    axis.text.x  = element_text(angle = 90, hjust = 1, size = 15),
-    axis.text.y  = element_text(size = 15),
-    legend.position      = "top",
-    legend.title         = element_text(size = 15),
-    legend.text          = element_text(size = 15)
-  ) +
-  labs(title = " ", x = "", y = "")
 
 # Intra- vs inter-region distance summary (printed to console)
 dist_df <- as.data.frame(dist_matrix) %>%
@@ -315,34 +277,20 @@ jaccard_region <- net_meta %>%
   arrange(jaccard) %>%
   mutate(region = factor(region, levels = region))
 
-# Connectivity overlap bar plot
-jaccard_global_connect <- ggplot(jaccard_region,
-                                 aes(x = jaccard, y = region, fill = jaccard)) +
-  geom_col(width = 0.95, color = "black", linewidth = 1) +
-  geom_text(aes(label = round(jaccard, 3)),
-            hjust = 1.3, color = "white", size = 8, fontface = "bold") +
-  scale_fill_gradient(low = "steelblue", high = "firebrick") +
-  labs(title = "Global connectivity overlap", x = "", y = "") +
-  theme_minimal(base_size = 20) +
-  theme(
-    legend.position          = "none",
-    plot.title               = element_text(hjust = 0.4),
-    panel.grid.major.y       = element_blank(),
-    panel.grid.minor         = element_blank()
-  )
-
-#Vis
-
-jaccard_global_connect
+print(jaccard_region)
 
 # -----------------------------------------------------------------------------
 # 8. Heatmap: signed log-transformed differences (AD vs control)
 # -----------------------------------------------------------------------------
 
+# Symmetric breaks so that zero difference maps to the neutral midpoint
+diff_lim <- max(abs(diffs_mat_log), na.rm = TRUE)
+
 heatmap_global <- grid::grid.grabExpr(
   pheatmap(
     diffs_mat_log,
     color        = colorRampPalette(c("firebrick4", "gray93", "cornflowerblue"))(100),
+    breaks       = seq(-diff_lim, diff_lim, length.out = 101),
     cluster_rows = TRUE,
     cluster_cols = TRUE,
     scale        = "none",
@@ -353,30 +301,17 @@ heatmap_global <- grid::grid.grabExpr(
 )
 
 # -----------------------------------------------------------------------------
-# 9. Assemble composite figures
+# 9. Assemble composite figure
 # -----------------------------------------------------------------------------
 
-# Figure A: distance heatmap + PCA  (panels A & B)
-top_panel <- plot_grid(
-  heatmap_dist,
+# PCA + differences heatmap  (panels A & B)
+final_plot <- plot_grid(
   pca.p,
-  labels     = c("A", "B"),
-  label_size = 14,
-  ncol       = 2,
-  rel_widths = c(1, 1)
-)
-
-# Figure B: differences heatmap + Jaccard overlap  (panels C & D)
-bottom_panel <- plot_grid(
   heatmap_global,
-  jaccard_global_connect,
-  labels     = c("C", "D"),
+  labels     = c("A", "B"),
   label_size = 14,
   ncol       = 2
 )
-
-# Full composite
-final_plot <- plot_grid(top_panel, bottom_panel, ncol = 1)
 
 #Vis
 final_plot
@@ -391,11 +326,11 @@ ggsave("FigureS1_contributions_pca.pdf",  contrib.p, width = 15, height = 13, dp
 ggsave("pca_metrics.jpeg",         pca.p,       width =  5, height =  5, dpi = 300)
 ggsave("pca_metrics.pdf",          pca.p,       width =  5, height =  5, dpi = 300)
 
-ggsave("jaccard_connectivity.jpeg", jaccard_global_connect, width = 5, height = 5, dpi = 300)
-ggsave("jaccard_connectivity.pdf",  jaccard_global_connect, width = 5, height = 5, dpi = 300)
+ggsave("heatmap_global_diffs.jpeg", heatmap_global, width = 8, height = 7, dpi = 300)
+ggsave("heatmap_global_diffs.pdf",  heatmap_global, width = 8, height = 7, dpi = 300)
 
-ggsave("Figure1_final_global_figure.jpeg", final_plot, width = 16, height = 14, dpi = 300)
-ggsave("Figure1_final_global_figure.pdf",  final_plot, width = 16, height = 14, dpi = 300)
+ggsave("Figure1_final_global_figure.jpeg", final_plot, width = 16, height = 7, dpi = 300)
+ggsave("Figure1_final_global_figure.pdf",  final_plot, width = 16, height = 7, dpi = 300)
 
 # =============================================================================
 # END

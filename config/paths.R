@@ -4,7 +4,7 @@
 #   Rscript 06_visualization/3.plots_global.R
 #
 # inputs/  — real pipeline data (gitignored). Populate locally; see README.md
-#            for the expected layout (networks/, topology/, enrichment/, DEGS/, graphs/).
+#            for the expected layout (networks/, topology/, enrichment/, DEGS/, expression_matrices/).
 # outputs/ — intermediate results written by the pipeline (gitignored, regenerable).
 # plots/   — final manuscript figures (tracked in git).
 

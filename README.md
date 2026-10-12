@@ -28,7 +28,7 @@ Raw expression and metadata were obtained from the following AMP-AD cohorts, ava
 ├── 01_network_construction/  # Network filtering, format conversion, and test data generation
 ├── 02_topology/              # Global and local topological metrics
 ├── 03_community_detection/   # Module identification and functional enrichment
-├── 04_hub_analysis/          # Hub gene detection and GABAergic rewiring
+├── 04_hub_analysis/          # Hub gene detection across regions and phenotypes
 ├── 05_expression/            # Differential expression and module eigengene summaries
 │   └── exploratory/          # Scratch scripts, not part of the reproducible pipeline
 ├── 06_visualization/         # Figures for global metrics and Jaccard similarity matrices
@@ -58,8 +58,7 @@ inputs/
 ├── topology/             # networks_summary.csv + *_nodes_summary.csv (from 02_topology, --per_node)
 ├── enrichment/           # *_enrichment.csv (from 03_community_detection/community_enrichment_MF_BP_KEGG.R)
 ├── DEGS/                 # limma_*_allGenes.tsv differential expression tables (one per region)
-├── expression_matrices/  # per-region *_counts_{AD,control}.tsv + metadata .txt (05_expression)
-└── graphs/               # translated (gene-symbol) .graphml networks, used by gabaergic_rewiring.R
+└── expression_matrices/  # per-region *_counts_{AD,control}.tsv + metadata .txt (05_expression)
 ```
 
 `00_preprocessing/*.R` and `05_expression/metadata_demographics.R` read raw counts/metadata
@@ -142,8 +141,6 @@ Run with: `bash/run_comm_enr.sh`, `bash/run_comm_enr_2net.sh`
 | Script | Description |
 |--------|-------------|
 | `4.wide_hubs.R` | Identifies hub genes by degree and PageRank across all networks |
-| `GABA_ego_analysis.R` | Ego network analysis centered on GABAergic marker genes |
-| `gabaergic_rewiring.R` | Quantifies connectivity rewiring of GABAergic genes in AD vs. controls |
 
 ### 05 — Expression
 
